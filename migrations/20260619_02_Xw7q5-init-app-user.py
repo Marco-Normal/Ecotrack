@@ -18,7 +18,7 @@ if db_name is None:
     raise ValueError(
         "Variável ambiente do nome da base de dados está faltando")
 steps = [
-    step(f"CREATE ROLE {app_user} WITH LOGIN PASSWORD {app_password}"),
+    step(f'CREATE ROLE "{app_user}" WITH LOGIN PASSWORD \'{app_password}\''),
     step(
         f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {app_user};"
     ),
