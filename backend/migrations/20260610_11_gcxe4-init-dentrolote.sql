@@ -7,6 +7,6 @@ CREATE TABLE IF NOT EXISTS dentroLote(
        CONSTRAINT lote_dentroLote_fk
            FOREIGN KEY(nroSerie)
            REFERENCES lote(nroSerie)
-           ON DELETE RESTRICT
+           ON DELETE CASCADE
            ON UPDATE CASCADE
 );     
