@@ -93,6 +93,13 @@ export interface ApiService {
     tipoProduto: TipoProduto,
     numerosControle: string[]
   ): Promise<Lote>;
+  criarProduto(
+    nome: string,
+    tipo: TipoProduto,
+    qtd: number,
+    pessoa: string,
+    creditos: number
+  ): Promise<Produto>;
   criarTransporte(input: NovoTransporteInput): Promise<Transporte>;
   rastrearLote(numeroSerie: string): Promise<ResultadoRastreio>;
   obterResumo(): Promise<ResumoPainel>;

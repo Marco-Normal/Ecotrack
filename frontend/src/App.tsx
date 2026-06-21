@@ -16,6 +16,7 @@ import {
   IconTruck,
   IconSearch,
   IconUser,
+  IconLeaf,
 } from './icons';
 import type { IconProps } from './icons';
 import { GlobalStyles } from './components/ui';
@@ -24,13 +25,15 @@ import CadastroLote       from './components/features/CadastroLote';
 import CadastroTransporte from './components/features/CadastroTransporte';
 import ConsultaRastreio   from './components/features/ConsultaRastreio';
 import AreaCidadao        from './components/features/AreaCidadao';
+import CadastroProduto    from './components/features/CadastroProduto';
 
 // ---------- tipos locais ------------------------------------------------------
 
-type TabId = 'painel' | 'lote' | 'transporte' | 'rastreio' | 'cidadao';
+type TabId = 'painel' | 'lote' | 'transporte' | 'rastreio' | 'cidadao' | 'produto';
 
 const TABS: { id: TabId; label: string; Icone: React.FC<IconProps> }[] = [
   { id: 'painel',     label: 'Painel',               Icone: IconLayout  },
+  { id: 'produto',    label: 'Cadastrar Produto',    Icone: IconLeaf    },
   { id: 'lote',       label: 'Cadastrar Lote',        Icone: IconPackage },
   { id: 'transporte', label: 'Cadastrar Transporte',  Icone: IconTruck   },
   { id: 'rastreio',   label: 'Rastrear Lote',         Icone: IconSearch  },
@@ -88,6 +91,7 @@ const App: React.FC = () => {
       <main style={styles.main}>
         <div style={styles.mainInner}>
           {tab === 'painel'     && <Painel />}
+          {tab === 'produto'    && <CadastroProduto />}
           {tab === 'lote'       && <CadastroLote />}
           {tab === 'transporte' && <CadastroTransporte />}
           {tab === 'rastreio'   && <ConsultaRastreio />}

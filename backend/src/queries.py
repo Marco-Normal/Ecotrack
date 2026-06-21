@@ -51,6 +51,21 @@ class PgPool:
                 )
                 return cur.fetchall()
 
+    def inserir_produto(self, nro_controle: uuid.UUID, nome: str, tipo: str, pessoa_cpf: str, qtd: int, creditos: int):
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO produto (nroControle, nome, tipo, pessoa, qtd) VALUES (%s, %s, %s, %s, %s) RETURNING nroControle, nome, centroColeta, dataHora, tipo, pessoa, qtd",
+                    (nro_controle, nome, tipo, pessoa_cpf, qtd),
+                )
+                result = cur.fetchone()
+                cur.execute(
+                    "UPDATE pessoa SET creditos = creditos + %s WHERE cpf = %s",
+                    (creditos, pessoa_cpf),
+                )
+                conn.commit()
+                return result
+
     # ── Lotes ─────────────────────────────────────────────────────────
 
     def listar_lotes(self):
@@ -68,6 +83,23 @@ class PgPool:
                     """
                 )
                 return cur.fetchall()
+
+    TIPO_ABBREV = {
+        "Reciclavel": "REC",
+        "Orgânico": "ORG",
+        "Tecnologia": "TEC",
+    }
+
+    def gerar_nome_lote(self, tipo: str) -> str:
+        abreviacao = self.TIPO_ABBREV.get(tipo, tipo[:3].upper())
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT COUNT(*) FROM lote WHERE tipo = %s",
+                    (tipo,),
+                )
+                seq = cur.fetchone()[0] + 1
+        return f"LOTE-{abreviacao}-{seq:03d}"
 
     def inserir_lote(self, nro_serie: uuid.UUID, nome: str | None, tipo: str):
         """Insere um lote e retorna (nroSerie, nome, tipo, dataHora)."""
