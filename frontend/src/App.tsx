@@ -94,10 +94,6 @@ const App: React.FC = () => {
           {tab === 'cidadao'    && <AreaCidadao />}
         </div>
       </main>
-
-      <footer style={styles.footer}>
-        Protótipo EcoTrack — dados simulados em memória na camada de serviço (apiService).
-      </footer>
     </div>
   );
 };
