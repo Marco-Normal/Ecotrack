@@ -2,7 +2,7 @@
 -- depends: 20260610_11_gcxe4-init-dentrolote
 CREATE TABLE IF NOT EXISTS produto(
        nroControle UUID NOT NULL DEFAULT gen_random_uuid(),
-       centroColeta CHAR(14) NOT NULL,
+       centroColeta CHAR(14),
        dataHora TIMESTAMP NOT NULL  DEFAULT NOW(),
        tipo tipo NOT NULL,
        pessoa CHAR(14) NOT NULL,
