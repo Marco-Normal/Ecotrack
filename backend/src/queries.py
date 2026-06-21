@@ -137,3 +137,134 @@ class PgPool:
                     ORDER BY total_vezes_resgatada DESC;
                     """)
             return cursor.fetchall()
+        
+    def empresas_transportaram_todos_tipos_produto(self):
+        """Essa query tem a função de listar as empresas que já receberam, 
+        através de um transporte finalizado, entregas referentes a todos os 
+        tipos de produtos que elas possuem cadastrados em seu estoque de produtos
+        atualmente, devolvendo o CNPJ, o nome e o tipo de atuação da empresa. 
+        A busca é restrita às empresas dos tipos 'Reciclavel', 'Tecnologia' 
+        ou 'Coleta'.
+
+        Para isso, aplicamos uma lógica de dupla negação (onde garantimos 
+        que não existe um tipo no estoque sem um transporte correspondente). 
+        Dentro dessa verificação, uma sequência de `INNER JOIN`s é feita: 
+        ligamos as informações de transporte com o histórico para validar 
+        se o status da viagem consta como 'Entregue' (primeiro INNER JOIN), 
+        juntamos com as informações do lote (segundo INNER JOIN) e dos itens 
+        presentes dentro desse lote (terceiro INNER JOIN) para conseguirmos 
+        chegar aos dados do produto transportado (quarto INNER JOIN). Assim, 
+        conseguimos checar se o tipo do produto entregue para esse destinatário 
+        bate com o tipo listado no estoque, e por fim, ordenamos o resultado 
+        pelo nome da empresa em ordem alfabética.
+
+        Divisão relacional.
+        """
+        with self._pegar_cursor() as cursor:
+            cursor.execute("""
+                SELECT e.cnpj, e.nome, e.tipo
+                FROM empresas AS e
+                WHERE e.tipo IN ('Reciclavel', 'Tecnologia', 'Coleta')
+                -- Divisão: NÃO EXISTE tipo no estoque SEM transporte entregue
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM estoque AS est
+                    WHERE est.cnpj = e.cnpj
+                    -- Para este tipo, não há transporte entregue
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM transporte AS t
+                        INNER JOIN historico AS h ON t.codEnvio = h.codEnvio
+                        INNER JOIN lote AS l ON t.codEnvio = l.codigoEnvio
+                        INNER JOIN dentroLote AS dl ON l.nroSerie = dl.nroSerie AND l.codigoEnvio = dl.codEnvio
+                        INNER JOIN produto AS p ON dl.produto = p.nroControle
+                        WHERE t.destinatario = e.cnpj
+                        AND h.status = 'Entregue'
+                        AND p.tipo = est.tipo
+                    )
+                )
+                ORDER BY e.nome;
+            """)
+            return cursor.fetchall()
+
+    def ranking_eficiencia_empresa_tipo(self):
+        """Essa query tem a função de ranquear as empresas de acordo com a 
+        sua eficiência no tempo de entrega, agrupadas por tipo de produto. 
+        Ela devolve o tipo do produto, o nome da empresa destinatária, o tempo 
+        médio gasto nas entregas, o total de transportes realizados, a posição 
+        no ranking, uma classificação textual de desempenho e o tempo médio 
+        convertido em horas. O resultado final lista apenas as 5 melhores 
+        empresas para cada categoria de produto.
+
+        Para isso, o processo é dividido em etapas lógicas. Primeiro, calculamos 
+        o tempo total de cada transporte cruzando a tabela de transportes com 
+        o histórico duas vezes (dois `INNER JOIN`s): uma para pegar o momento 
+        de início ('Processando') e outra para o fim ('Entregue'). Na sequência, 
+        uma série de `INNER JOIN`s liga esse transporte aos lotes, aos itens 
+        dentro do lote e aos produtos para descobrir qual foi o tipo de produto 
+        entregue, além de buscar o nome da empresa destinatária. Com essa base 
+        pronta, agrupamos os dados para tirar a média de tempo de cada empresa, 
+        filtrando apenas aquelas que têm pelo menos 3 entregas. Por fim, 
+        comparamos o tempo de cada empresa com a média geral do seu tipo de 
+        produto, gerando um ranking e uma classificação (Excelente, Dentro da 
+        média ou Acima da média), ordenando o pódio das mais eficientes.
+        """
+        with self._pegar_cursor() as cursor:
+            cursor.execute("""
+                WITH transporte_completo AS (
+                    -- Base: transportes finalizados com tempo de ciclo
+                    SELECT 
+                        t.destinatario AS cnpj_destino,
+                        p.tipo AS tipo_produto,
+                        h_fim.dataHora - h_inicio.dataHora AS tempo_ciclo,
+                        e.nome AS nome_empresa
+                    FROM transporte AS t
+                    INNER JOIN historico AS h_inicio 
+                        ON t.codEnvio = h_inicio.codEnvio AND h_inicio.status = 'Processando'
+                    INNER JOIN historico AS h_fim 
+                        ON t.codEnvio = h_fim.codEnvio AND h_fim.status = 'Entregue'
+                    INNER JOIN lote AS l ON t.codEnvio = l.codigoEnvio
+                    INNER JOIN dentroLote AS dl ON l.nroSerie = dl.nroSerie AND l.codigoEnvio = dl.codEnvio
+                    INNER JOIN produto AS p ON dl.produto = p.nroControle
+                    INNER JOIN empresas AS e ON t.destinatario = e.cnpj
+                ),
+                metricas_por_empresa_tipo AS (
+                    -- Agregação por empresa e tipo
+                    SELECT 
+                        cnpj_destino,
+                        nome_empresa,
+                        tipo_produto,
+                        AVG(tempo_ciclo) AS tempo_medio,
+                        COUNT(*) AS total_transportes,
+                        MIN(tempo_ciclo) AS melhor_tempo,
+                        MAX(tempo_ciclo) AS pior_tempo
+                    FROM transporte_completo
+                    GROUP BY cnpj_destino, nome_empresa, tipo_produto
+                    HAVING COUNT(*) >= 3  -- Mínimo 3 transportes para significância
+                ),
+                ranking AS (
+                    -- Window function: rank por tipo de produto
+                    SELECT 
+                        *,
+                        ROW_NUMBER() OVER (PARTITION BY tipo_produto ORDER BY tempo_medio ASC) AS rank_eficiencia,
+                        AVG(tempo_medio) OVER (PARTITION BY tipo_produto) AS media_tipo,
+                        CASE 
+                            WHEN tempo_medio <= AVG(tempo_medio) OVER (PARTITION BY tipo_produto) * 0.8 THEN 'Excelente'
+                            WHEN tempo_medio <= AVG(tempo_medio) OVER (PARTITION BY tipo_produto) * 1.2 THEN 'Dentro da média'
+                            ELSE 'Acima da média'
+                        END AS classificacao
+                    FROM metricas_por_empresa_tipo
+                )
+                SELECT 
+                    tipo_produto,
+                    nome_empresa,
+                    tempo_medio,
+                    total_transportes,
+                    rank_eficiencia,
+                    classificacao,
+                    ROUND(EXTRACT(EPOCH FROM tempo_medio)/3600, 2) AS tempo_medio_horas
+                FROM ranking
+                WHERE rank_eficiencia <= 5  -- Top 5 por tipo
+                ORDER BY tipo_produto, rank_eficiencia;
+            """)
+            return cursor.fetchall()
