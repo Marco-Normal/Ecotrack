@@ -107,16 +107,16 @@ class PgPool:
         """Essa query tem a função de fazer uma pequena sumarização
         para as empresas de reciclavel e tecnologia (esses tipos foram
         escolhidos arbitrariamente), mostrando o nome da empresa, seus
-        estoques e quantas vezes cada tipo de produtos que eles
+        estoques e quantas vezes cada tipo de recompensa que eles
         possuem foram resgatados. Dessa forma, a empresa pode, por
-        exemplo identificar produtos com maior demanda e aumentar sua
-        quantidade, ou retirar produtos com menor demanda.
+        exemplo identificar recompensas com maior demanda e aumentar sua
+        quantidade, ou retirar recompensas com menor demanda.
 
         A query funciona encontrando todos os estoques de uma
         determinada empresa (primeiro INNER JOIN) e então fazer uma
         junção externa a esquerda, de forma a preservar todas as
         tuplas da junção anterior.  Isso é necessário, pois pode
-        ocorrer de existir um tipo de produto no estoque que não foi
+        ocorrer de existir um tipo de recompensa no estoque que não foi
         resgatado, aparecendo então com nulo na parte de recompensa e
         consequentemente, o COUNT irá acusar 0 linhas, corretamente.
         A partir disso, agrupamos por empresa, tipo de recompensa no
@@ -186,85 +186,38 @@ class PgPool:
                 ORDER BY e.nome;
             """)
             return cursor.fetchall()
-
-    def ranking_eficiencia_empresa_tipo(self):
-        """Essa query tem a função de ranquear as empresas de acordo com a 
-        sua eficiência no tempo de entrega, agrupadas por tipo de produto. 
-        Ela devolve o tipo do produto, o nome da empresa destinatária, o tempo 
-        médio gasto nas entregas, o total de transportes realizados, a posição 
-        no ranking, uma classificação textual de desempenho e o tempo médio 
-        convertido em horas. O resultado final lista apenas as 5 melhores 
-        empresas para cada categoria de produto.
-
-        Para isso, o processo é dividido em etapas lógicas. Primeiro, calculamos 
-        o tempo total de cada transporte cruzando a tabela de transportes com 
-        o histórico duas vezes (dois `INNER JOIN`s): uma para pegar o momento 
-        de início ('Processando') e outra para o fim ('Entregue'). Na sequência, 
-        uma série de `INNER JOIN`s liga esse transporte aos lotes, aos itens 
-        dentro do lote e aos produtos para descobrir qual foi o tipo de produto 
-        entregue, além de buscar o nome da empresa destinatária. Com essa base 
-        pronta, agrupamos os dados para tirar a média de tempo de cada empresa, 
-        filtrando apenas aquelas que têm pelo menos 3 entregas. Por fim, 
-        comparamos o tempo de cada empresa com a média geral do seu tipo de 
-        produto, gerando um ranking e uma classificação (Excelente, Dentro da 
-        média ou Acima da média), ordenando o pódio das mais eficientes.
+        
+    def cidados_acima_media_quantidade(self):
+        """Esta query lista cidadãos que reciclam uma quantidade média de produtos 
+        maior que a média geral de quantidade por transação. 
+        Utiliza agregação, agrupamento e subquery na cláusula HAVING, semelhante 
+        à query 'empresas_t_maior_media', mas focada em cidadãos.
+        
+        Não usa divisão relacional (evita o padrão de dupla negação EXISTS).
         """
+        
         with self._pegar_cursor() as cursor:
             cursor.execute("""
-                WITH transporte_completo AS (
-                    -- Base: transportes finalizados com tempo de ciclo
-                    SELECT 
-                        t.destinatario AS cnpj_destino,
-                        p.tipo AS tipo_produto,
-                        h_fim.dataHora - h_inicio.dataHora AS tempo_ciclo,
-                        e.nome AS nome_empresa
-                    FROM transporte AS t
-                    INNER JOIN historico AS h_inicio 
-                        ON t.codEnvio = h_inicio.codEnvio AND h_inicio.status = 'Processando'
-                    INNER JOIN historico AS h_fim 
-                        ON t.codEnvio = h_fim.codEnvio AND h_fim.status = 'Entregue'
-                    INNER JOIN lote AS l ON t.codEnvio = l.codigoEnvio
-                    INNER JOIN dentroLote AS dl ON l.nroSerie = dl.nroSerie AND l.codigoEnvio = dl.codEnvio
-                    INNER JOIN produto AS p ON dl.produto = p.nroControle
-                    INNER JOIN empresas AS e ON t.destinatario = e.cnpj
-                ),
-                metricas_por_empresa_tipo AS (
-                    -- Agregação por empresa e tipo
-                    SELECT 
-                        cnpj_destino,
-                        nome_empresa,
-                        tipo_produto,
-                        AVG(tempo_ciclo) AS tempo_medio,
-                        COUNT(*) AS total_transportes,
-                        MIN(tempo_ciclo) AS melhor_tempo,
-                        MAX(tempo_ciclo) AS pior_tempo
-                    FROM transporte_completo
-                    GROUP BY cnpj_destino, nome_empresa, tipo_produto
-                    HAVING COUNT(*) >= 3  -- Mínimo 3 transportes para significância
-                ),
-                ranking AS (
-                    -- Window function: rank por tipo de produto
-                    SELECT 
-                        *,
-                        ROW_NUMBER() OVER (PARTITION BY tipo_produto ORDER BY tempo_medio ASC) AS rank_eficiencia,
-                        AVG(tempo_medio) OVER (PARTITION BY tipo_produto) AS media_tipo,
-                        CASE 
-                            WHEN tempo_medio <= AVG(tempo_medio) OVER (PARTITION BY tipo_produto) * 0.8 THEN 'Excelente'
-                            WHEN tempo_medio <= AVG(tempo_medio) OVER (PARTITION BY tipo_produto) * 1.2 THEN 'Dentro da média'
-                            ELSE 'Acima da média'
-                        END AS classificacao
-                    FROM metricas_por_empresa_tipo
-                )
                 SELECT 
-                    tipo_produto,
-                    nome_empresa,
-                    tempo_medio,
-                    total_transportes,
-                    rank_eficiencia,
-                    classificacao,
-                    ROUND(EXTRACT(EPOCH FROM tempo_medio)/3600, 2) AS tempo_medio_horas
-                FROM ranking
-                WHERE rank_eficiencia <= 5  -- Top 5 por tipo
-                ORDER BY tipo_produto, rank_eficiencia;
+                    p.nome AS nome_cidadao,
+                    AVG(prod.qtd) AS media_quantidade_reciclada
+                FROM pessoa AS p
+                INNER JOIN produto AS prod ON p.cpf = prod.pessoa
+                INNER JOIN dentroLote AS dl ON prod.nroControle = dl.produto
+                INNER JOIN lote AS l ON dl.nroSerie = l.nroSerie AND dl.codEnvio = l.codigoEnvio
+                INNER JOIN transporte AS t ON l.codigoEnvio = t.codEnvio
+                INNER JOIN historico AS h ON t.codEnvio = h.codEnvio AND h.status = 'Entregue'
+                GROUP BY p.nome
+                HAVING AVG(prod.qtd) > (
+                    SELECT AVG(qtd) 
+                    FROM produto 
+                    INNER JOIN dentroLote ON produto.nroControle = dentroLote.produto
+                    INNER JOIN lote ON dentroLote.nroSerie = lote.nroSerie AND dentroLote.codEnvio = lote.codigoEnvio
+                    INNER JOIN transporte ON lote.codigoEnvio = transporte.codEnvio
+                    INNER JOIN historico ON transporte.codEnvio = historico.codEnvio
+                    WHERE historico.status = 'Entregue'
+                )
+                ORDER BY media_quantidade_reciclada DESC;
             """)
             return cursor.fetchall()
+    
