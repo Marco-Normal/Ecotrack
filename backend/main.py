@@ -153,15 +153,13 @@ async def produtos_do_lote(nroSerie: uuid.UUID, db: PgPool = Depends(get_db)):
 @app.post("/api/lotes", response_model=LoteSchema)
 async def criar_lote(input: CriarLoteInput, db: PgPool = Depends(get_db)):
     tipo_db = normalizar_tipo(input.tipo)
-    lote = db.inserir_lote(input.nroSerie, input.nome, tipo_db)
-    if not lote:
-        raise HTTPException(status_code=500, detail="Falha ao criar lote")
-    for prod in input.produtos:
-        try:
-            db.associar_produto_ao_lote(prod, input.nroSerie)
-        except Exception:
-            pass
-    return LoteSchema(**dict(zip(["nroSerie","nome","tipo","dataHora"], lote)))
+    try:
+        lote = db.criar_lote_com_produtos(
+            input.nroSerie, input.nome, tipo_db, input.produtos
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return LoteSchema(**dict(zip(["nroSerie", "nome", "tipo", "dataHora"], lote)))
 
 # ── Transportes ──────────────────────────────────────────────────────
 

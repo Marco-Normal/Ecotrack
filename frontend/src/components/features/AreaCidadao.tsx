@@ -399,14 +399,6 @@ const AreaCidadao: React.FC = () => {
             <IconUser size={15} /> Acessar Painel
           </PrimaryButton>
         </div>
-
-        {/* dica de CPF para teste */}
-        {!produtos && !erroProdutos && !isLoadingProdutos && (
-          <p style={{ ...styles.helperText, margin: 0 }}>
-            CPFs de teste: <code style={{ fontFamily: tokens.fontMono }}>123.456.789-00</code> (4 produtos)
-            ou <code style={{ fontFamily: tokens.fontMono }}>987.654.321-00</code> (2 produtos).
-          </p>
-        )}
       </form>
 
       {isLoadingProdutos && (

@@ -99,6 +99,25 @@ class PgPool:
                     (nro_serie,),
                 )
                 return [row[0] for row in cur.fetchall()]
+            
+    def criar_lote_com_produtos(
+        self, nro_serie: uuid.UUID, nome: str | None, tipo: str, produtos: list[uuid.UUID]
+    ):
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO lote (nroSerie, nome, tipo) VALUES (%s, %s, %s) "
+                    "RETURNING nroSerie, nome, tipo, dataHora",
+                    (nro_serie, nome, tipo),
+                )
+                lote = cur.fetchone()
+                for prod in produtos:
+                    cur.execute(
+                        "INSERT INTO dentroLote (produto, nroSerie) VALUES (%s, %s)",
+                        (prod, nro_serie),
+                    )
+            conn.commit()  # só chega aqui se tudo der certo
+        return lote
 
     # ── Transportes ──────────────────────────────────────────────────
 
@@ -134,24 +153,22 @@ class PgPool:
     # ── Rastreamento ─────────────────────────────────────────────────
 
     def rastrear_por_termo(self, termo: str):
-        """Retorna dados do lote + produtos + transportes, buscando por nroSerie ou nome."""
-        lote = None
         with self._conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT nroSerie, nome, tipo, dataHora FROM lote WHERE nroSerie::text = %s OR nome = %s",
+                    "SELECT nroSerie, nome, tipo, dataHora FROM lote "
+                    "WHERE nroSerie::text = %s OR nome = %s",
                     (termo, termo),
                 )
                 lote = cur.fetchone()
-        if not lote:
-            return None
-        nro_serie = lote[0]
-        produtos = []
-        with self._conn() as conn:
-            with conn.cursor() as cur:
+                if not lote:
+                    return None
+                nro_serie = lote[0]
+
                 cur.execute(
                     """
-                    SELECT p.nroControle, p.nome, p.centroColeta, p.dataHora, p.tipo, p.pessoa, p.qtd
+                    SELECT p.nroControle, p.nome, p.centroColeta, p.dataHora,
+                        p.tipo, p.pessoa, p.qtd
                     FROM produto p
                     INNER JOIN dentroLote dl ON p.nroControle = dl.produto
                     WHERE dl.nroSerie = %s
@@ -159,10 +176,25 @@ class PgPool:
                     (nro_serie,),
                 )
                 produtos = cur.fetchall()
-        transportes_raw = self.transportes_do_lote(nro_serie)
+
+                cur.execute(
+                    """
+                    SELECT t.codEnvio, t.nome, t.destinatario, t.remetente, t.lote,
+                        rem.nome AS remetente_nome, dest.nome AS destinatario_nome
+                    FROM transporte t
+                    LEFT JOIN empresas rem ON t.remetente = rem.cnpj
+                    LEFT JOIN empresas dest ON t.destinatario = dest.cnpj
+                    WHERE t.lote = %s
+                    ORDER BY t.codEnvio
+                    """,
+                    (nro_serie,),
+                )
+                transportes_raw = cur.fetchall()
+
         chaves_lote = ["nroSerie", "nome", "tipo", "dataHora"]
         chaves_produto = ["nroControle", "nome", "centroColeta", "dataHora", "tipo", "pessoa", "qtd"]
         chaves_transporte = ["codEnvio", "nome", "destinatario", "remetente", "lote", "remetente_nome", "destinatario_nome"]
+
         return {
             "lote": dict(zip(chaves_lote, lote)),
             "produtos": [dict(zip(chaves_produto, p)) for p in produtos],
