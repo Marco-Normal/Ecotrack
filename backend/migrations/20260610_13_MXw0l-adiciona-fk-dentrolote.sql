@@ -3,4 +3,6 @@
 ALTER TABLE dentroLote
 ADD CONSTRAINT prod_dentroLote_fk
 FOREIGN KEY(produto)
-REFERENCES produto(nroControle);
+REFERENCES produto(nroControle)
+ON DELETE CASCADE
+ON UPDATE CASCADE;

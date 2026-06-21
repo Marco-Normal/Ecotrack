@@ -107,16 +107,16 @@ class PgPool:
         """Essa query tem a função de fazer uma pequena sumarização
         para as empresas de reciclavel e tecnologia (esses tipos foram
         escolhidos arbitrariamente), mostrando o nome da empresa, seus
-        estoques e quantas vezes cada tipo de produtos que eles
+        estoques e quantas vezes cada tipo de recompensa que eles
         possuem foram resgatados. Dessa forma, a empresa pode, por
-        exemplo identificar produtos com maior demanda e aumentar sua
-        quantidade, ou retirar produtos com menor demanda.
+        exemplo identificar recompensas com maior demanda e aumentar sua
+        quantidade, ou retirar recompensas com menor demanda.
 
         A query funciona encontrando todos os estoques de uma
         determinada empresa (primeiro INNER JOIN) e então fazer uma
         junção externa a esquerda, de forma a preservar todas as
         tuplas da junção anterior.  Isso é necessário, pois pode
-        ocorrer de existir um tipo de produto no estoque que não foi
+        ocorrer de existir um tipo de recompensa no estoque que não foi
         resgatado, aparecendo então com nulo na parte de recompensa e
         consequentemente, o COUNT irá acusar 0 linhas, corretamente.
         A partir disso, agrupamos por empresa, tipo de recompensa no
@@ -137,3 +137,87 @@ class PgPool:
                     ORDER BY total_vezes_resgatada DESC;
                     """)
             return cursor.fetchall()
+        
+    def empresas_transportaram_todos_tipos_produto(self):
+        """Essa query tem a função de listar as empresas que já receberam, 
+        através de um transporte finalizado, entregas referentes a todos os 
+        tipos de produtos que elas possuem cadastrados em seu estoque de produtos
+        atualmente, devolvendo o CNPJ, o nome e o tipo de atuação da empresa. 
+        A busca é restrita às empresas dos tipos 'Reciclavel', 'Tecnologia' 
+        ou 'Coleta'.
+
+        Para isso, aplicamos uma lógica de dupla negação (onde garantimos 
+        que não existe um tipo no estoque sem um transporte correspondente). 
+        Dentro dessa verificação, uma sequência de `INNER JOIN`s é feita: 
+        ligamos as informações de transporte com o histórico para validar 
+        se o status da viagem consta como 'Entregue' (primeiro INNER JOIN), 
+        juntamos com as informações do lote (segundo INNER JOIN) e dos itens 
+        presentes dentro desse lote (terceiro INNER JOIN) para conseguirmos 
+        chegar aos dados do produto transportado (quarto INNER JOIN). Assim, 
+        conseguimos checar se o tipo do produto entregue para esse destinatário 
+        bate com o tipo listado no estoque, e por fim, ordenamos o resultado 
+        pelo nome da empresa em ordem alfabética.
+
+        Divisão relacional.
+        """
+        with self._pegar_cursor() as cursor:
+            cursor.execute("""
+                SELECT e.cnpj, e.nome, e.tipo
+                FROM empresas AS e
+                WHERE e.tipo IN ('Reciclavel', 'Tecnologia', 'Coleta')
+                -- Divisão: NÃO EXISTE tipo no estoque SEM transporte entregue
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM estoque AS est
+                    WHERE est.cnpj = e.cnpj
+                    -- Para este tipo, não há transporte entregue
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM transporte AS t
+                        INNER JOIN historico AS h ON t.codEnvio = h.codEnvio
+                        INNER JOIN lote AS l ON t.codEnvio = l.codigoEnvio
+                        INNER JOIN dentroLote AS dl ON l.nroSerie = dl.nroSerie AND l.codigoEnvio = dl.codEnvio
+                        INNER JOIN produto AS p ON dl.produto = p.nroControle
+                        WHERE t.destinatario = e.cnpj
+                        AND h.status = 'Entregue'
+                        AND p.tipo = est.tipo
+                    )
+                )
+                ORDER BY e.nome;
+            """)
+            return cursor.fetchall()
+        
+    def cidados_acima_media_quantidade(self):
+        """Esta query lista cidadãos que reciclam uma quantidade média de produtos 
+        maior que a média geral de quantidade por transação. 
+        Utiliza agregação, agrupamento e subquery na cláusula HAVING, semelhante 
+        à query 'empresas_t_maior_media', mas focada em cidadãos.
+        
+        Não usa divisão relacional (evita o padrão de dupla negação EXISTS).
+        """
+        
+        with self._pegar_cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    p.nome AS nome_cidadao,
+                    AVG(prod.qtd) AS media_quantidade_reciclada
+                FROM pessoa AS p
+                INNER JOIN produto AS prod ON p.cpf = prod.pessoa
+                INNER JOIN dentroLote AS dl ON prod.nroControle = dl.produto
+                INNER JOIN lote AS l ON dl.nroSerie = l.nroSerie AND dl.codEnvio = l.codigoEnvio
+                INNER JOIN transporte AS t ON l.codigoEnvio = t.codEnvio
+                INNER JOIN historico AS h ON t.codEnvio = h.codEnvio AND h.status = 'Entregue'
+                GROUP BY p.nome
+                HAVING AVG(prod.qtd) > (
+                    SELECT AVG(qtd) 
+                    FROM produto 
+                    INNER JOIN dentroLote ON produto.nroControle = dentroLote.produto
+                    INNER JOIN lote ON dentroLote.nroSerie = lote.nroSerie AND dentroLote.codEnvio = lote.codigoEnvio
+                    INNER JOIN transporte ON lote.codigoEnvio = transporte.codEnvio
+                    INNER JOIN historico ON transporte.codEnvio = historico.codEnvio
+                    WHERE historico.status = 'Entregue'
+                )
+                ORDER BY media_quantidade_reciclada DESC;
+            """)
+            return cursor.fetchall()
+    

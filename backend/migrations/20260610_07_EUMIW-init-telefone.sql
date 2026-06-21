@@ -7,4 +7,6 @@ CREATE TABLE IF NOT EXISTS telefones(
        CONSTRAINT tel_pessoa_fk
            FOREIGN KEY(cpf)
            REFERENCES pessoa(cpf)
-)
+           ON DELETE CASCADE
+           ON UPDATE CASCADE
+);

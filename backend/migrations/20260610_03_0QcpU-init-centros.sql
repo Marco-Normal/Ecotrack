@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS centroReciclagem (
        CONSTRAINT cr_empresas_fk
           FOREIGN KEY(cnpj)
           REFERENCES empresas(cnpj)
+          ON DELETE CASCADE
+          ON UPDATE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS centroColeta (
@@ -15,4 +17,6 @@ CREATE TABLE IF NOT EXISTS centroColeta (
        CONSTRAINT cc_empresas_fk
           FOREIGN KEY(cnpj)
           REFERENCES empresas(cnpj)
+          ON DELETE CASCADE
+          ON UPDATE CASCADE
 );
