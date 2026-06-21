@@ -1,0 +1,100 @@
+// ============================================================================
+//  APP ROOT — navegação por abas e composição das features
+//
+//  Este arquivo só conhece:
+//    - os tokens de design (para o layout do shell)
+//    - os ícones necessários para as abas
+//    - os quatro componentes de feature (cada um é independente)
+//
+//  Para adicionar uma nova aba, basta:
+//    1. Criar o componente em components/features/
+//    2. Adicionar uma entrada em TABS
+//    3. Renderizá-la no bloco de conteúdo abaixo
+// ============================================================================
+
+import React, { useState } from 'react';
+import { tokens, styles } from './design/tokens';
+import { IconRecycle, IconLayout, IconPackage, IconTruck, IconSearch } from './icons';
+import type { IconProps } from './icons';
+import { GlobalStyles } from './components/ui';
+import Painel           from './components/features/Painel';
+import CadastroLote     from './components/features/CadastroLote';
+import CadastroTransporte from './components/features/CadastroTransporte';
+import ConsultaRastreio from './components/features/ConsultaRastreio';
+
+// ---------- tipos locais ------------------------------------------------------
+
+type TabId = 'painel' | 'lote' | 'transporte' | 'rastreio';
+
+const TABS: { id: TabId; label: string; Icone: React.FC<IconProps> }[] = [
+  { id: 'painel',     label: 'Painel',               Icone: IconLayout  },
+  { id: 'lote',       label: 'Cadastrar Lote',        Icone: IconPackage },
+  { id: 'transporte', label: 'Cadastrar Transporte',  Icone: IconTruck   },
+  { id: 'rastreio',   label: 'Rastrear Lote',         Icone: IconSearch  },
+];
+
+// ---------- componente --------------------------------------------------------
+
+const App: React.FC = () => {
+  const [tab, setTab] = useState<TabId>('painel');
+
+  return (
+    <div className="ecotrack-root" style={styles.root}>
+      <GlobalStyles />
+
+      {/* Cabeçalho */}
+      <header style={styles.header}>
+        <div style={styles.headerInner}>
+          <div style={styles.brandRow}>
+            <div style={styles.brandMark}>
+              <IconRecycle size={22} />
+            </div>
+            <div>
+              <div style={styles.brandTitle}>ECOTRACK</div>
+              <div style={styles.brandTag}>rastreamento de descarte sustentável</div>
+            </div>
+          </div>
+        </div>
+        <div style={styles.barcodeStripe} aria-hidden="true" />
+      </header>
+
+      {/* Navegação por abas */}
+      <nav style={styles.tabNav} aria-label="Funcionalidades do sistema">
+        <div style={styles.tabNavInner}>
+          {TABS.map(({ id, label, Icone }) => {
+            const ativo = tab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTab(id)}
+                className="ecotrack-tab-btn"
+                style={{ ...styles.tabButton, ...(ativo ? styles.tabButtonActive : {}) }}
+                aria-current={ativo ? 'page' : undefined}
+              >
+                <Icone size={16} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* Conteúdo da aba ativa */}
+      <main style={styles.main}>
+        <div style={styles.mainInner}>
+          {tab === 'painel'     && <Painel />}
+          {tab === 'lote'       && <CadastroLote />}
+          {tab === 'transporte' && <CadastroTransporte />}
+          {tab === 'rastreio'   && <ConsultaRastreio />}
+        </div>
+      </main>
+
+      <footer style={styles.footer}>
+        Protótipo EcoTrack — dados simulados em memória na camada de serviço (apiService).
+      </footer>
+    </div>
+  );
+};
+
+export default App;

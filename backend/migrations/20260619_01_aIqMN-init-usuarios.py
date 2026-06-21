@@ -16,8 +16,7 @@ if migrator_user is None or migrator_password is None:
 if db_name is None:
     raise ValueError(
         "Variável ambiente do nome da base de dados está faltando")
-steps = [step(f"CREATE ROLE {migrator_user} WITH PASSWORD {migrator_password} LOGIN CREATEDB CREATEROLE;"),
-         step(f"GRANT CONNECT ON DATABASE {db_name} to {migrator_user};"),
+steps = [step(f'CREATE ROLE "{migrator_user}" WITH PASSWORD \'{migrator_password}\' LOGIN CREATEDB CREATEROLE;'),
          step(f"GRANT USAGE, CREATE ON SCHEMA public TO {migrator_user};"),
          step(
              f"GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO {migrator_user};"),
