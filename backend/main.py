@@ -196,11 +196,9 @@ async def criar_produto(input: CriarProdutoInput, db: PgPool = Depends(get_db)):
 
 @app.get("/api/produtos/{cpf}", response_model=List[ProdutoSchema])
 async def produtos_por_cpf(cpf: str, db: PgPool = Depends(get_db)):
-    with db._conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT cpf, nome, creditos FROM pessoa WHERE cpf = %s", (cpf,))
-            pessoa = cur.fetchone()
+    with db._pegar_cursor() as cur:
+        cur.execute("SELECT cpf, nome, creditos FROM pessoa WHERE cpf = %s", (cpf,))
+        pessoa = cur.fetchone()
     if not pessoa:
         raise HTTPException(status_code=404, detail="CPF não encontrado")
     rows = db.produtos_por_cpf(cpf)
