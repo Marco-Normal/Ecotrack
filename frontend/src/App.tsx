@@ -1,36 +1,40 @@
 // ============================================================================
 //  APP ROOT — navegação por abas e composição das features
 //
-//  Este arquivo só conhece:
-//    - os tokens de design (para o layout do shell)
-//    - os ícones necessários para as abas
-//    - os quatro componentes de feature (cada um é independente)
-//
-//  Para adicionar uma nova aba, basta:
+//  Para adicionar uma nova aba:
 //    1. Criar o componente em components/features/
 //    2. Adicionar uma entrada em TABS
 //    3. Renderizá-la no bloco de conteúdo abaixo
 // ============================================================================
 
 import React, { useState } from 'react';
-import { tokens, styles } from './design/tokens';
-import { IconRecycle, IconLayout, IconPackage, IconTruck, IconSearch } from './icons';
+import { styles } from './design/tokens';
+import {
+  IconRecycle,
+  IconLayout,
+  IconPackage,
+  IconTruck,
+  IconSearch,
+  IconUser,
+} from './icons';
 import type { IconProps } from './icons';
 import { GlobalStyles } from './components/ui';
-import Painel           from './components/features/Painel';
-import CadastroLote     from './components/features/CadastroLote';
+import Painel             from './components/features/Painel';
+import CadastroLote       from './components/features/CadastroLote';
 import CadastroTransporte from './components/features/CadastroTransporte';
-import ConsultaRastreio from './components/features/ConsultaRastreio';
+import ConsultaRastreio   from './components/features/ConsultaRastreio';
+import AreaCidadao        from './components/features/AreaCidadao';
 
 // ---------- tipos locais ------------------------------------------------------
 
-type TabId = 'painel' | 'lote' | 'transporte' | 'rastreio';
+type TabId = 'painel' | 'lote' | 'transporte' | 'rastreio' | 'cidadao';
 
 const TABS: { id: TabId; label: string; Icone: React.FC<IconProps> }[] = [
   { id: 'painel',     label: 'Painel',               Icone: IconLayout  },
   { id: 'lote',       label: 'Cadastrar Lote',        Icone: IconPackage },
   { id: 'transporte', label: 'Cadastrar Transporte',  Icone: IconTruck   },
   { id: 'rastreio',   label: 'Rastrear Lote',         Icone: IconSearch  },
+  { id: 'cidadao',    label: 'Área do Cidadão',       Icone: IconUser    },
 ];
 
 // ---------- componente --------------------------------------------------------
@@ -87,8 +91,13 @@ const App: React.FC = () => {
           {tab === 'lote'       && <CadastroLote />}
           {tab === 'transporte' && <CadastroTransporte />}
           {tab === 'rastreio'   && <ConsultaRastreio />}
+          {tab === 'cidadao'    && <AreaCidadao />}
         </div>
       </main>
+
+      <footer style={styles.footer}>
+        Protótipo EcoTrack — dados simulados em memória na camada de serviço (apiService).
+      </footer>
     </div>
   );
 };
