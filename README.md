@@ -39,6 +39,9 @@ Essa é a versão inicial onde ainda _não corrigimos_ a segunda parte do relat�
 Não tem problema, nesse caso o _commit_ do arquivo `.env` pois não será uma base que irá para produção e não contém nenhum segredo, além do que, facilita a integração. Porém, fica avisado que você *nunca deveria commitar o `.env`*
 
 ### QUICKSTART
+```bash
+cd backend
+```
 #### Python
 Para começar a codar no python, crie um venv
 
