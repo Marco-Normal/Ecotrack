@@ -40,22 +40,25 @@ let _produtos: Produto[] = [
   // -- Recicláveis do cidadão 1 (CPF 123.456.789-00)
   {
     numeroControle: 'REC-7741',
+    nome: 'Garrafa PET 500ml',
     tipo: 'Reciclável',
     pessoaCpf: '123.456.789-00',
-    dataDescarte: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), // 10 dias atrás
+    dataDescarte: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
     numeroControle: 'REC-7742',
+    nome: 'Caixa de Papelão',
     tipo: 'Reciclável',
     pessoaCpf: '123.456.789-00',
     dataDescarte: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
   },
   // -- Recicláveis sem CPF (descarte anônimo)
-  { numeroControle: 'REC-7743', tipo: 'Reciclável' },
-  { numeroControle: 'REC-7744', tipo: 'Reciclável' },
+  { numeroControle: 'REC-7743', nome: 'Lata de Alumínio', tipo: 'Reciclável' },
+  { numeroControle: 'REC-7744', nome: 'Vidro Transparente', tipo: 'Reciclável' },
   // -- Orgânicos do cidadão 1
   {
     numeroControle: 'ORG-3310',
+    nome: 'Resíduo Vegetal',
     tipo: 'Orgânico',
     pessoaCpf: '123.456.789-00',
     dataDescarte: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
@@ -63,14 +66,16 @@ let _produtos: Produto[] = [
   // -- Orgânicos do cidadão 2 (CPF 987.654.321-00)
   {
     numeroControle: 'ORG-3311',
+    nome: 'Borra de Café',
     tipo: 'Orgânico',
     pessoaCpf: '987.654.321-00',
     dataDescarte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
   },
-  { numeroControle: 'ORG-3312', tipo: 'Orgânico' },
+  { numeroControle: 'ORG-3312', nome: 'Casca de Fruta', tipo: 'Orgânico' },
   // -- Tecnologia do cidadão 1
   {
     numeroControle: 'TEC-9001',
+    nome: 'Smartphone Antigo',
     tipo: 'Tecnologia',
     pessoaCpf: '123.456.789-00',
     dataDescarte: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
@@ -78,11 +83,12 @@ let _produtos: Produto[] = [
   // -- Tecnologia do cidadão 2
   {
     numeroControle: 'TEC-9002',
+    nome: 'Carregador USB',
     tipo: 'Tecnologia',
     pessoaCpf: '987.654.321-00',
     dataDescarte: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
   },
-  { numeroControle: 'TEC-9003', tipo: 'Tecnologia' },
+  { numeroControle: 'TEC-9003', nome: 'Pilha Alcalina', tipo: 'Tecnologia' },
 ];
 
 let _lotes: Lote[] = [];

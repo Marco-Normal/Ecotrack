@@ -102,8 +102,11 @@ const TimelineCidadao: React.FC<{ logistica: LogisticaProduto; onFechar: () => v
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <TagLabel>{produto.numeroControle}</TagLabel>
+          <span style={{ fontWeight: 700, fontSize: 15, color: tokens.ink }}>{produto.nome}</span>
           <TipoBadge tipo={produto.tipo} />
+          <span style={{ fontSize: 12, color: tokens.inkMuted, fontFamily: tokens.fontMono }}>
+            {produto.numeroControle}
+          </span>
         </div>
         <button
           onClick={onFechar}
@@ -235,14 +238,21 @@ const ProdutoRow: React.FC<ProdutoRowProps> = ({ produto, selecionado, carregand
       fontFamily: 'inherit',
     }}
   >
-    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const }}>
-      <TagLabel>{produto.numeroControle}</TagLabel>
-      <TipoBadge tipo={produto.tipo} />
-      {produto.dataDescarte && (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const }}>
+        <span style={{ fontWeight: 700, fontSize: 14, color: tokens.ink }}>{produto.nome}</span>
+        <TipoBadge tipo={produto.tipo} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const }}>
         <span style={{ fontSize: 12, color: tokens.inkMuted, fontFamily: tokens.fontMono }}>
-          Descartado em {new Date(produto.dataDescarte).toLocaleDateString('pt-BR')}
+          {produto.numeroControle}
         </span>
-      )}
+        {produto.dataDescarte && (
+          <span style={{ fontSize: 12, color: tokens.inkMuted }}>
+            · Descartado em {new Date(produto.dataDescarte).toLocaleDateString('pt-BR')}
+          </span>
+        )}
+      </div>
     </div>
     <div style={{ color: selecionado ? tokens.primary : tokens.inkMuted, display: 'flex' }}>
       {carregando

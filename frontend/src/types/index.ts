@@ -8,6 +8,7 @@ export type TipoProduto = 'Reciclável' | 'Orgânico' | 'Tecnologia';
 
 export interface Produto {
   numeroControle: string;
+  nome: string;
   tipo: TipoProduto;
   loteId?: string;
   /** CPF do cidadão que realizou o descarte. Opcional para produtos sem vínculo. */
