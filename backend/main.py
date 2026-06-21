@@ -195,14 +195,9 @@ async def criar_produto(input: CriarProdutoInput, db: PgPool = Depends(get_db)):
 
 
 @app.get("/api/produtos/{cpf}", response_model=List[ProdutoSchema])
-async def produtos_por_cpf(cpf: str, db: PgPool = Depends(get_db)):
-    with db._pegar_cursor() as cur:
-        cur.execute("SELECT cpf, nome, creditos FROM pessoa WHERE cpf = %s", (cpf,))
-        pessoa = cur.fetchone()
-    if not pessoa:
-        raise HTTPException(status_code=404, detail="CPF não encontrado")
-    rows = db.produtos_por_cpf(cpf)
-    if not rows:
+        cur.execute(
+            "SELECT cpf, nome, creditos FROM pessoa WHERE cpf = %s", (cpf,))
+        cur.execute(
         raise HTTPException(
             status_code=404, detail="Nenhum produto para este CPF")
     return [
@@ -226,12 +221,12 @@ async def produtos_por_cpf(cpf: str, db: PgPool = Depends(get_db)):
     ]
 
 
-@app.get("/api/produtos/{numeroControle}/logistica")
-async def logistica(numeroControle: uuid.UUID, db: PgPool = Depends(get_db)):
-    rows = db.timeline_logistica(numeroControle)
+@ app.get("/api/produtos/{numeroControle}/logistica")
+async def logistica(numeroControle: uuid.UUID, db: PgPool=Depends(get_db)):
+    rows=db.timeline_logistica(numeroControle)
     if not rows:
         raise HTTPException(status_code=404, detail="Timeline não encontrada")
-    keys = [
+    keys=[
         "nome_cidadao",
         "tipo_produto",
         "quantidade",
@@ -244,9 +239,9 @@ async def logistica(numeroControle: uuid.UUID, db: PgPool = Depends(get_db)):
 # ── Lotes ────────────────────────────────────────────────────────────
 
 
-@app.get("/api/lotes", response_model=List[LoteSchema])
-async def listar_lotes(db: PgPool = Depends(get_db)):
-    rows = db.listar_lotes()
+@ app.get("/api/lotes", response_model=List[LoteSchema])
+async def listar_lotes(db: PgPool=Depends(get_db)):
+    rows=db.listar_lotes()
     if not rows:
         raise HTTPException(status_code=404, detail="Nenhum lote encontrado")
     return [
@@ -257,17 +252,17 @@ async def listar_lotes(db: PgPool = Depends(get_db)):
     ]
 
 
-@app.get("/api/lotes/{nroSerie}/produtos")
-async def produtos_do_lote(nroSerie: uuid.UUID, db: PgPool = Depends(get_db)):
-    produtos = db.produtos_do_lote(nroSerie)
+@ app.get("/api/lotes/{nroSerie}/produtos")
+async def produtos_do_lote(nroSerie: uuid.UUID, db: PgPool=Depends(get_db)):
+    produtos=db.produtos_do_lote(nroSerie)
     return {"produtos": [str(p) for p in produtos]}
 
 
-@app.post("/api/lotes", response_model=LoteSchema)
-async def criar_lote(input: CriarLoteInput, db: PgPool = Depends(get_db)):
-    tipo_db = normalizar_tipo(input.tipo)
-    nome = input.nome or db.gerar_nome_lote(tipo_db)
-    lote = db.inserir_lote(input.nroSerie, nome, tipo_db)
+@ app.post("/api/lotes", response_model=LoteSchema)
+async def criar_lote(input: CriarLoteInput, db: PgPool=Depends(get_db)):
+    tipo_db=normalizar_tipo(input.tipo)
+    nome=input.nome or db.gerar_nome_lote(tipo_db)
+    lote=db.inserir_lote(input.nroSerie, nome, tipo_db)
     if not lote:
         raise HTTPException(status_code=500, detail="Falha ao criar lote")
     for prod in input.produtos:
@@ -281,10 +276,10 @@ async def criar_lote(input: CriarLoteInput, db: PgPool = Depends(get_db)):
 # ── Transportes ──────────────────────────────────────────────────────
 
 
-@app.post("/api/transportes", response_model=TransporteSchema)
-async def criar_transporte(input: CriarTransporteInput, db: PgPool = Depends(get_db)):
-    cod_envio = input.codEnvio or uuid.uuid4()
-    res = db.inserir_transporte(
+@ app.post("/api/transportes", response_model=TransporteSchema)
+async def criar_transporte(input: CriarTransporteInput, db: PgPool=Depends(get_db)):
+    cod_envio=input.codEnvio or uuid.uuid4()
+    res=db.inserir_transporte(
         cod_envio, input.nome, input.destinatario, input.remetente, input.lote
     )
     if not res:
@@ -298,9 +293,9 @@ async def criar_transporte(input: CriarTransporteInput, db: PgPool = Depends(get
 # ── Rastreio ─────────────────────────────────────────────────────────
 
 
-@app.get("/api/rastrear/{termo}")
-async def rastrear(termo: str, db: PgPool = Depends(get_db)):
-    data = db.rastrear_por_termo(termo)
+@ app.get("/api/rastrear/{termo}")
+async def rastrear(termo: str, db: PgPool=Depends(get_db)):
+    data=db.rastrear_por_termo(termo)
     if not data:
         raise HTTPException(status_code=404, detail="Lote não encontrado")
     return data
@@ -309,12 +304,12 @@ async def rastrear(termo: str, db: PgPool = Depends(get_db)):
 # ── Resumo ───────────────────────────────────────────────────────────
 
 
-@app.get("/api/resumo")
-async def resumo(db: PgPool = Depends(get_db)):
-    base = db.resumo_painel()
+@ app.get("/api/resumo")
+async def resumo(db: PgPool=Depends(get_db)):
+    base=db.resumo_painel()
     if not base:
         raise HTTPException(status_code=404, detail="Resumo indisponível")
-    lotes = db.listar_lotes()[:5]
+    lotes=db.listar_lotes()[:5]
     return {
         "contagens": {
             "total_produtos": base[0],
@@ -336,17 +331,17 @@ async def resumo(db: PgPool = Depends(get_db)):
 # endpoints para resgate de créditos
 
 
-@app.get("/api/cidadao/{cpf}")
-async def buscar_cidadao(cpf: str, db: PgPool = Depends(get_db)):
-    row = db.cidadao_por_cpf(cpf)
+@ app.get("/api/cidadao/{cpf}")
+async def buscar_cidadao(cpf: str, db: PgPool=Depends(get_db)):
+    row=db.cidadao_por_cpf(cpf)
     if not row:
         raise HTTPException(status_code=404, detail="Cidadão não encontrado")
     return dict(zip(["cpf", "nome", "creditos"], row))
 
 
-@app.get("/api/estoque")
-async def listar_estoque(db: PgPool = Depends(get_db)):
-    rows = db.listar_estoque_resgate()
+@ app.get("/api/estoque")
+async def listar_estoque(db: PgPool=Depends(get_db)):
+    rows=db.listar_estoque_resgate()
     if not rows:
         return []
     return [
@@ -355,11 +350,11 @@ async def listar_estoque(db: PgPool = Depends(get_db)):
     ]
 
 
-@app.post("/api/resgatar")
-async def resgatar_creditos(input: ResgateInput, db: PgPool = Depends(get_db)):
-    tipo_db = normalizar_tipo(input.tipo)
+@ app.post("/api/resgatar")
+async def resgatar_creditos(input: ResgateInput, db: PgPool=Depends(get_db)):
+    tipo_db=normalizar_tipo(input.tipo)
     try:
-        resultado = db.executar_resgate_transacao(
+        resultado=db.executar_resgate_transacao(
             input.cpf, input.cnpj, tipo_db)
         return resultado
     except ValueError as e:
