@@ -230,6 +230,7 @@ export const styles: Record<string, React.CSSProperties> = {
     fontSize: 21,
     letterSpacing: '0.01em',
     margin: 0,
+    color: "black",
   },
   sectionDesc: {
     fontSize: 13.5,
