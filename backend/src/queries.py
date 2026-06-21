@@ -164,6 +164,25 @@ class PgPool:
                 (nro_serie,),
             )
             return [row[0] for row in cursor.fetchall()]
+            
+    def criar_lote_com_produtos(
+        self, nro_serie: uuid.UUID, nome: str | None, tipo: str, produtos: list[uuid.UUID]
+    ):
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO lote (nroSerie, nome, tipo) VALUES (%s, %s, %s) "
+                    "RETURNING nroSerie, nome, tipo, dataHora",
+                    (nro_serie, nome, tipo),
+                )
+                lote = cur.fetchone()
+                for prod in produtos:
+                    cur.execute(
+                        "INSERT INTO dentroLote (produto, nroSerie) VALUES (%s, %s)",
+                        (prod, nro_serie),
+                    )
+            conn.commit()  # só chega aqui se tudo der certo
+        return lote
 
     # ── Transportes ──────────────────────────────────────────────────
 
@@ -219,45 +238,48 @@ class PgPool:
         série (nroSerie) ou pelo seu nome (nome), retornando todos os
         dados do lote, os produtos que o compõem e os transportes
         associados.
-
-        O parâmetro `termo` pode ser tanto um UUID (nroSerie) quanto
-        uma string textual (nome). A busca é feita comparando o termo
-        com a representação textual do nroSerie (`nroSerie::text`) ou
-        diretamente com o nome. Se um lote for encontrado, seus
-        produtos são buscados via INNER JOIN com `dentroLote` e seus
-        transportes via `transportes_do_lote`.
-
-        O resultado é um dicionário com três chaves: `lote` (dict),
-        `produtos` (lista de dicts) e `transportes` (lista de dicts).
-
-        Chamada pelo endpoint GET /api/rastrear/{termo}.
         """
-        lote = None
-        with self._pegar_cursor() as cursor:
-            cursor.execute(
-                "SELECT nroSerie, nome, tipo, dataHora FROM lote WHERE nroSerie::text = %s OR nome = %s",
+        with self._pegar_cursor() as cur:
+            cur.execute(
+                "SELECT nroSerie, nome, tipo, dataHora FROM lote "
+                "WHERE nroSerie::text = %s OR nome = %s",
                 (termo, termo),
             )
-            lote = cursor.fetchone()
-        if not lote:
-            return None
-        nro_serie = lote[0]
-        produtos = []
-        with self._pegar_cursor() as cursor:
-            cursor.execute(
+            lote = cur.fetchone()
+            if not lote:
+                return None
+            nro_serie = lote[0]
+
+            cur.execute(
                 """
-                SELECT p.nroControle, p.nome, p.centroColeta, p.dataHora, p.tipo, p.pessoa, p.qtd
+                SELECT p.nroControle, p.nome, p.centroColeta, p.dataHora,
+                    p.tipo, p.pessoa, p.qtd
                 FROM produto p
                 INNER JOIN dentroLote dl ON p.nroControle = dl.produto
                 WHERE dl.nroSerie = %s
                 """,
                 (nro_serie,),
             )
-            produtos = cursor.fetchall()
-        transportes_raw = self.transportes_do_lote(nro_serie)
+            produtos = cur.fetchall()
+
+            cur.execute(
+                """
+                SELECT t.codEnvio, t.nome, t.destinatario, t.remetente, t.lote,
+                    rem.nome AS remetente_nome, dest.nome AS destinatario_nome
+                FROM transporte t
+                LEFT JOIN empresas rem ON t.remetente = rem.cnpj
+                LEFT JOIN empresas dest ON t.destinatario = dest.cnpj
+                WHERE t.lote = %s
+                ORDER BY t.codEnvio
+                """,
+                (nro_serie,),
+            )
+            transportes_raw = cur.fetchall()
+            
         chaves_lote = ["nroSerie", "nome", "tipo", "dataHora"]
         chaves_produto = ["nroControle", "nome", "centroColeta", "dataHora", "tipo", "pessoa", "qtd"]
         chaves_transporte = ["codEnvio", "nome", "destinatario", "remetente", "lote", "remetente_nome", "destinatario_nome"]
+
         return {
             "lote": dict(zip(chaves_lote, lote)),
             "produtos": [dict(zip(chaves_produto, p)) for p in produtos],
@@ -603,3 +625,66 @@ class PgPool:
                 ORDER BY tipo_produto, rank_eficiencia;
             """)
             return cursor.fetchall()
+            
+# Queries para resgate de créditos ─────────────────────────
+
+    def cidadao_por_cpf(self, cpf: str):
+        """Busca os dados e saldo atual do cidadão."""
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT cpf, nome, creditos FROM pessoa WHERE cpf = %s", (cpf,))
+                return cur.fetchone()
+
+    def listar_estoque_resgate(self):
+        """Lista opções de resgate que possuem quantidade > 0."""
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT e.cnpj, emp.nome, e.tipo, e.valor, e.quantidade 
+                    FROM estoque e
+                    INNER JOIN empresas emp ON e.cnpj = emp.cnpj
+                    WHERE e.quantidade > 0
+                """)
+                return cur.fetchall()
+
+    def executar_resgate_transacao(self, cpf: str, cnpj: str, tipo_estoque: str):
+        """Transação ACID blindada para resgate de créditos."""
+        with self._conn() as conn:
+            # O bloco with conn.transaction() garante o COMMIT ou ROLLBACK automático
+            with conn.transaction():
+                with conn.cursor() as cur:
+                    
+                    # 1. Trava a linha da pessoa (FOR UPDATE) e checa o saldo
+                    cur.execute("SELECT creditos FROM pessoa WHERE cpf = %s FOR UPDATE", (cpf,))
+                    pessoa = cur.fetchone()
+                    if not pessoa:
+                        raise ValueError("Cidadão não encontrado.")
+                    saldo_atual = pessoa[0]
+
+                    # 2. Trava a linha do estoque (FOR UPDATE) e checa disponibilidade
+                    cur.execute("""
+                        SELECT quantidade, valor FROM estoque 
+                        WHERE cnpj = %s AND tipo = %s FOR UPDATE
+                    """, (cnpj, tipo_estoque))
+                    estoque = cur.fetchone()
+                    if not estoque:
+                        raise ValueError("Estoque não encontrado.")
+                    
+                    qtd_atual, valor_custo = estoque
+                    
+                    # Validações de negócio
+                    if qtd_atual <= 0:
+                        raise ValueError("Estoque esgotado para este item.")
+                    if saldo_atual < valor_custo:
+                        raise ValueError(f"Saldo insuficiente. Você tem {saldo_atual} créditos e precisa de {valor_custo}.")
+
+                    # 3. Debita os créditos da Pessoa
+                    cur.execute("UPDATE pessoa SET creditos = creditos - %s WHERE cpf = %s", (valor_custo, cpf))
+
+                    # 4. Reduz o estoque da Empresa
+                    cur.execute("UPDATE estoque SET quantidade = quantidade - 1 WHERE cnpj = %s AND tipo = %s", (cnpj, tipo_estoque))
+
+                    # 5. Registra o histórico da Recompensa
+                    cur.execute("INSERT INTO recompensa (cpf, cnpj, tipo) VALUES (%s, %s, %s)", (cpf, cnpj, tipo_estoque))
+                    
+                    return {"sucesso": True, "novo_saldo": saldo_atual - valor_custo}
