@@ -104,9 +104,6 @@ const TimelineCidadao: React.FC<{ logistica: LogisticaProduto; onFechar: () => v
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontWeight: 700, fontSize: 15, color: tokens.ink }}>{produto.nome}</span>
           <TipoBadge tipo={produto.tipo} />
-          <span style={{ fontSize: 12, color: tokens.inkMuted, fontFamily: tokens.fontMono }}>
-            {produto.numeroControle}
-          </span>
         </div>
         <button
           onClick={onFechar}
@@ -244,9 +241,7 @@ const ProdutoRow: React.FC<ProdutoRowProps> = ({ produto, selecionado, carregand
         <TipoBadge tipo={produto.tipo} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const }}>
-        <span style={{ fontSize: 12, color: tokens.inkMuted, fontFamily: tokens.fontMono }}>
-          {produto.numeroControle}
-        </span>
+        <span style={{ fontSize: 12, color: tokens.inkMuted }}>{produto.nome}</span>
         {produto.dataDescarte && (
           <span style={{ fontSize: 12, color: tokens.inkMuted }}>
             · Descartado em {new Date(produto.dataDescarte).toLocaleDateString('pt-BR')}

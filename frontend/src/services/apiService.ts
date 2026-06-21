@@ -1,11 +1,4 @@
-// ============================================================================
-//  CAMADA DE SERVIÇO (in-memory mock)
-//
-//  Os arrays abaixo simulam tabelas de banco de dados.
-//  Para substituir por um backend real, reescreva o corpo de cada função
-//  usando fetch() / axios — os componentes dependem apenas de ApiService.
-// ============================================================================
-
+import axios from 'axios';
 import type {
   ApiService,
   EventoLogistico,
@@ -15,296 +8,199 @@ import type {
   Transporte,
   NovoTransporteInput,
   TipoProduto,
+  ResultadoRastreio,
+  ResumoPainel,
 } from '../types';
 
-// ---------- helpers internos -------------------------------------------------
+const API = axios.create({ baseURL: 'http://localhost:8000' });
 
-function delayDeRede(min = 500, max = 950): Promise<void> {
-  const tempo = Math.floor(Math.random() * (max - min + 1)) + min;
-  return new Promise((resolve) => setTimeout(resolve, tempo));
+// Interceptor para transformar erros HTTP em mensagens amigáveis
+API.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (!err.response) {
+      throw new Error('Não foi possível conectar ao servidor. Verifique se o backend está rodando.');
+    }
+    const status = err.response.status;
+    if (status === 404) {
+      const detail = err.response.data?.detail;
+      throw new Error(detail ?? 'Nenhum registro encontrado.');
+    }
+    if (status === 500) {
+      throw new Error('Erro interno do servidor. Tente novamente mais tarde.');
+    }
+    throw new Error(err.response.data?.detail ?? `Erro inesperado (${status}).`);
+  }
+);
+
+// DB: 'Reciclavel' (sem acento) -> Frontend: 'Reciclável'
+const TIPO_BACKEND: Record<string, string> = {
+  'Orgânico': 'Orgânico',
+  'Reciclável': 'Reciclavel',
+  'Tecnologia': 'Tecnologia',
+};
+
+const TIPO_FRONTEND: Record<string, TipoProduto> = {
+  'Orgânico': 'Orgânico',
+  'Reciclavel': 'Reciclável',
+  'Tecnologia': 'Tecnologia',
+  // fallback
+  'Reciclável': 'Reciclável',
+};
+
+function asTipoProduto(valor: string): TipoProduto {
+  return TIPO_FRONTEND[valor] ?? (valor as TipoProduto);
 }
 
-function gerarId(prefixo: string): string {
-  return `${prefixo}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+function montarProduto(row: any): Produto {
+  return {
+    numeroControle: row.nroControle ?? '',
+    nome: row.nome ?? '',
+    tipo: asTipoProduto(row.tipo),
+    pessoaCpf: row.pessoa ?? undefined,
+    dataDescarte: row.dataHora ?? undefined,
+  };
 }
 
-function normalizarDigitos(valor: string): string {
-  return valor.replace(/\D/g, '');
+function montarLote(row: any, produtosNro: string[]): Lote {
+  return {
+    id: row.nroSerie ?? '',
+    numeroSerie: row.nroSerie ?? '',
+    nome: row.nome ?? undefined,
+    tipoProduto: asTipoProduto(row.tipo),
+    produtosNumeroControle: produtosNro,
+    qtdProdutos: row.qtd_produtos ?? undefined,
+    dataCriacao: row.dataHora ?? new Date().toISOString(),
+  };
 }
 
-// ---------- "banco de dados" em memória -------------------------------------
-//  Produtos agora possuem pessoaCpf e dataDescarte para suportar a Área do
-//  Cidadão. CPF de teste: '123.456.789-00' e '987.654.321-00'.
-
-let _produtos: Produto[] = [
-  // -- Recicláveis do cidadão 1 (CPF 123.456.789-00)
-  {
-    numeroControle: 'REC-7741',
-    nome: 'Garrafa PET 500ml',
-    tipo: 'Reciclável',
-    pessoaCpf: '123.456.789-00',
-    dataDescarte: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    numeroControle: 'REC-7742',
-    nome: 'Caixa de Papelão',
-    tipo: 'Reciclável',
-    pessoaCpf: '123.456.789-00',
-    dataDescarte: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  // -- Recicláveis sem CPF (descarte anônimo)
-  { numeroControle: 'REC-7743', nome: 'Lata de Alumínio', tipo: 'Reciclável' },
-  { numeroControle: 'REC-7744', nome: 'Vidro Transparente', tipo: 'Reciclável' },
-  // -- Orgânicos do cidadão 1
-  {
-    numeroControle: 'ORG-3310',
-    nome: 'Resíduo Vegetal',
-    tipo: 'Orgânico',
-    pessoaCpf: '123.456.789-00',
-    dataDescarte: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  // -- Orgânicos do cidadão 2 (CPF 987.654.321-00)
-  {
-    numeroControle: 'ORG-3311',
-    nome: 'Borra de Café',
-    tipo: 'Orgânico',
-    pessoaCpf: '987.654.321-00',
-    dataDescarte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  { numeroControle: 'ORG-3312', nome: 'Casca de Fruta', tipo: 'Orgânico' },
-  // -- Tecnologia do cidadão 1
-  {
-    numeroControle: 'TEC-9001',
-    nome: 'Smartphone Antigo',
-    tipo: 'Tecnologia',
-    pessoaCpf: '123.456.789-00',
-    dataDescarte: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  // -- Tecnologia do cidadão 2
-  {
-    numeroControle: 'TEC-9002',
-    nome: 'Carregador USB',
-    tipo: 'Tecnologia',
-    pessoaCpf: '987.654.321-00',
-    dataDescarte: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  { numeroControle: 'TEC-9003', nome: 'Pilha Alcalina', tipo: 'Tecnologia' },
-];
-
-let _lotes: Lote[] = [];
-let _transportes: Transporte[] = [];
-
-// ---------- implementação do contrato ----------------------------------------
+function montarTransporte(row: any): Transporte {
+  return {
+    id: row.codEnvio ?? '',
+    loteId: row.lote ?? '',
+    codigoEnvio: row.codEnvio ?? '',
+    nome: row.nome ?? undefined,
+    cnpjRemetente: row.remetente ?? '',
+    cnpjDestinatario: row.destinatario ?? '',
+    nomeRemetente: row.remetente_nome ?? undefined,
+    nomeDestinatario: row.destinatario_nome ?? undefined,
+    dataRegistro: '',
+  };
+}
 
 export const apiService: ApiService = {
+
   async listarProdutosDisponiveisPorTipo(tipo: TipoProduto) {
-    await delayDeRede();
-    return _produtos
-      .filter((p) => p.tipo === tipo && !p.loteId)
-      .map((p) => ({ ...p }));
+    const { data } = await API.get('/api/produtos', {
+      params: { tipo: TIPO_BACKEND[tipo] ?? tipo },
+    });
+    if (!Array.isArray(data)) return [];
+    return data.map(montarProduto);
   },
 
   async listarLotes() {
-    await delayDeRede();
-    return [..._lotes]
-      .sort((a, b) => b.dataCriacao.localeCompare(a.dataCriacao))
-      .map((l) => ({ ...l, produtosNumeroControle: [...l.produtosNumeroControle] }));
+    const { data } = await API.get('/api/lotes');
+    if (!Array.isArray(data)) return [];
+    const lotes: Lote[] = [];
+    for (const row of data) {
+      let produtosNro: string[] = [];
+      try {
+        const resp = await API.get(`/api/lotes/${row.nroSerie}/produtos`);
+        produtosNro = resp.data.produtos ?? [];
+      } catch { /* ignora */ }
+      lotes.push(montarLote(row, produtosNro.map(String)));
+    }
+    return lotes;
   },
 
-  async criarLote(numeroSerie, tipoProduto, numerosControle) {
-    await delayDeRede();
-
-    const numeroSerieLimpo = numeroSerie.trim();
-    if (!numeroSerieLimpo) throw new Error('Informe um número de série para o lote.');
-    if (numerosControle.length === 0) throw new Error('Selecione ao menos um produto para compor o lote.');
-
-    const jaExiste = _lotes.some(
-      (l) => l.numeroSerie.toLowerCase() === numeroSerieLimpo.toLowerCase()
-    );
-    if (jaExiste) throw new Error(`Já existe um lote com o número de série "${numeroSerieLimpo}".`);
-
-    const idsValidos = new Set(
-      _produtos
-        .filter((p) => p.tipo === tipoProduto && !p.loteId)
-        .map((p) => p.numeroControle)
-    );
-    if (!numerosControle.every((nc) => idsValidos.has(nc))) {
-      throw new Error(
-        'Um ou mais produtos selecionados não estão mais disponíveis. Atualize a lista e tente novamente.'
-      );
-    }
-
-    const novoLote: Lote = {
-      id: gerarId('lote'),
-      numeroSerie: numeroSerieLimpo,
+  async criarLote(numeroSerie: string, tipoProduto: TipoProduto, numerosControle: string[], nome?: string) {
+    const { data } = await API.post('/api/lotes', {
+      nroSerie: numeroSerie,
+      nome,
+      tipo: TIPO_BACKEND[tipoProduto] ?? tipoProduto,
+      produtos: numerosControle,
+    });
+    return {
+      id: data.nroSerie ?? '',
+      numeroSerie: data.nroSerie ?? '',
+      nome: data.nome ?? nome,
       tipoProduto,
-      produtosNumeroControle: [...numerosControle],
-      dataCriacao: new Date().toISOString(),
+      produtosNumeroControle: numerosControle,
+      dataCriacao: data.dataHora ?? new Date().toISOString(),
     };
-
-    _lotes.push(novoLote);
-    _produtos = _produtos.map((p) =>
-      numerosControle.includes(p.numeroControle) ? { ...p, loteId: novoLote.id } : p
-    );
-
-    return { ...novoLote };
   },
 
   async criarTransporte(input: NovoTransporteInput) {
-    await delayDeRede();
-
-    const codigoEnvio = input.codigoEnvio.trim();
-    const cnpjRemetente = input.cnpjRemetente.trim();
-    const cnpjDestinatario = input.cnpjDestinatario.trim();
-
-    if (!input.loteId) throw new Error('Selecione um lote para registrar o transporte.');
-    if (!codigoEnvio || !cnpjRemetente || !cnpjDestinatario)
-      throw new Error('Preencha o código de envio e os CNPJs de remetente e destinatário.');
-    if (normalizarDigitos(cnpjRemetente) === normalizarDigitos(cnpjDestinatario))
-      throw new Error('O CNPJ do remetente não pode ser igual ao do destinatário.');
-
-    const lote = _lotes.find((l) => l.id === input.loteId);
-    if (!lote) throw new Error('O lote selecionado não foi encontrado. Ele pode ter sido removido.');
-
-    const novoTransporte: Transporte = {
-      id: gerarId('transp'),
-      loteId: lote.id,
-      codigoEnvio,
-      cnpjRemetente,
-      cnpjDestinatario,
-      dataRegistro: new Date().toISOString(),
-    };
-
-    _transportes.push(novoTransporte);
-    return { ...novoTransporte };
+    const { data } = await API.post('/api/transportes', {
+      codEnvio: input.codigoEnvio,
+      nome: input.nome,
+      destinatario: input.cnpjDestinatario.replace(/\D/g, ''),
+      remetente: input.cnpjRemetente.replace(/\D/g, ''),
+      lote: input.loteId,
+    });
+    return montarTransporte(data);
   },
 
-  async rastrearLote(numeroSerie) {
-    await delayDeRede();
-
-    const termo = numeroSerie.trim();
-    if (!termo) throw new Error('Digite o número de série de um lote para iniciar a busca.');
-
-    const lote = _lotes.find(
-      (l) => l.numeroSerie.toLowerCase() === termo.toLowerCase()
-    );
-    if (!lote) throw new Error(`Não encontramos nenhum lote com o número de série "${termo}".`);
-
-    const produtos = _produtos.filter((p) => p.loteId === lote.id).map((p) => ({ ...p }));
-    const transportes = _transportes
-      .filter((t) => t.loteId === lote.id)
-      .sort((a, b) => a.dataRegistro.localeCompare(b.dataRegistro))
-      .map((t) => ({ ...t }));
-
-    return { lote: { ...lote }, produtos, transportes };
+  async rastrearLote(numeroSerie: string) {
+    const { data } = await API.get(`/api/rastrear/${numeroSerie}`);
+    if (!data || !data.lote) throw new Error('Lote não encontrado');
+    const lote = data.lote;
+    const produtosNro = (data.produtos ?? []).map((p: any) => String(p.nroControle));
+    return {
+      lote: montarLote(lote, produtosNro),
+      produtos: (data.produtos ?? []).map(montarProduto),
+      transportes: (data.transportes ?? []).map(montarTransporte),
+    };
   },
 
   async obterResumo() {
-    await delayDeRede(350, 650);
-
-    const ultimosLotes = [..._lotes]
-      .sort((a, b) => b.dataCriacao.localeCompare(a.dataCriacao))
-      .slice(0, 5)
-      .map((l) => ({ ...l }));
-
+    const { data } = await API.get('/api/resumo');
+    const c = data.contagens ?? {};
+    const ultimos: Lote[] = (data.ultimos_lotes ?? []).map((row: any) => montarLote(row, []));
     return {
-      totalProdutos: _produtos.length,
-      produtosDisponiveis: _produtos.filter((p) => !p.loteId).length,
-      totalLotes: _lotes.length,
-      totalTransportes: _transportes.length,
-      ultimosLotes,
+      totalProdutos: c.total_produtos ?? 0,
+      produtosDisponiveis: c.produtos_disponiveis ?? 0,
+      totalLotes: c.total_lotes ?? 0,
+      totalTransportes: c.total_transportes ?? 0,
+      ultimosLotes: ultimos,
     };
   },
 
-  // ---------- Área do Cidadão ------------------------------------------------
-
   async buscarProdutosPorCpf(cpf: string) {
-    await delayDeRede();
-
-    const cpfLimpo = cpf.trim();
-    if (!cpfLimpo) throw new Error('Digite o seu CPF para consultar os descartes.');
-
-    // Aceita com ou sem formatação
-    const digitos = normalizarDigitos(cpfLimpo);
-    if (digitos.length !== 11) {
-      throw new Error('CPF inválido. Certifique-se de digitar os 11 dígitos corretamente.');
-    }
-
-    const encontrados = _produtos.filter(
-      (p) => p.pessoaCpf && normalizarDigitos(p.pessoaCpf) === digitos
-    );
-
-    if (encontrados.length === 0) {
-      throw new Error(
-        'Nenhum descarte encontrado para este CPF. Verifique o número digitado ou entre em contato com o ponto de coleta.'
-      );
-    }
-
-    return encontrados.map((p) => ({ ...p }));
+    const { data } = await API.get(`/api/produtos/${cpf}`);
+    if (!Array.isArray(data)) return [];
+    return data.map(montarProduto);
   },
 
   async obterLogisticaProduto(numeroControle: string) {
-    await delayDeRede();
-
-    const produto = _produtos.find((p) => p.numeroControle === numeroControle);
-    if (!produto) throw new Error(`Produto "${numeroControle}" não encontrado.`);
-
-    // JOIN: produto → lote → transportes
-    const lote = produto.loteId
-      ? (_lotes.find((l) => l.id === produto.loteId) ?? null)
-      : null;
-
-    const transportes = lote
-      ? _transportes
-          .filter((t) => t.loteId === lote.id)
-          .sort((a, b) => a.dataRegistro.localeCompare(b.dataRegistro))
-          .map((t) => ({ ...t }))
-      : [];
-
-    // Monta a timeline de eventos logísticos
-    const timeline: EventoLogistico[] = [];
-
-    // Evento 1: coleta no centro
-    timeline.push({
-      tipo: 'coleta',
-      data: produto.dataDescarte ?? new Date().toISOString(),
-      titulo: 'Recebido no Centro de Coleta',
-      descricao: `Produto ${produto.numeroControle} (${produto.tipo}) entregue e registrado no sistema.`,
-    });
-
-    if (!lote) {
-      // Produto ainda aguarda formação de lote
-      timeline.push({
-        tipo: 'aguardando',
-        data: new Date().toISOString(),
-        titulo: 'Aguardando Formação de Lote',
-        descricao: 'Seu produto foi recebido e está aguardando ser agrupado com outros itens do mesmo tipo para iniciar o transporte.',
-      });
-    } else {
-      // Evento 2: agrupamento em lote
-      timeline.push({
-        tipo: 'agrupamento',
-        data: lote.dataCriacao,
-        titulo: `Agrupado no Lote ${lote.numeroSerie}`,
-        descricao: `Seu produto foi consolidado no lote ${lote.numeroSerie} junto com mais ${lote.produtosNumeroControle.length - 1} item(ns) do tipo ${lote.tipoProduto}.`,
-      });
-
-      // Evento 3+: cada transporte vira um passo
-      transportes.forEach((t) => {
-        timeline.push({
-          tipo: 'transporte',
-          data: t.dataRegistro,
-          titulo: `Envio ${t.codigoEnvio}`,
-          descricao: `Transportado de ${t.cnpjRemetente} para ${t.cnpjDestinatario}.`,
-        });
-      });
+    const { data: rows } = await API.get(`/api/produtos/${numeroControle}/logistica`);
+    if (!Array.isArray(rows) || rows.length === 0) {
+      throw new Error('Timeline não encontrada');
     }
-
+    const produto: Produto = {
+      numeroControle,
+      nome: rows[0]?.nome_cidadao ?? '',
+      tipo: asTipoProduto(rows[0]?.tipo_produto ?? 'Reciclavel'),
+      dataDescarte: rows[0]?.horario_entrega ?? undefined,
+    };
+    const timeline: EventoLogistico[] = rows.map((r: any, i: number) => ({
+      tipo: i === 0 ? 'coleta' : 'transporte',
+      data: r.horario_entrega ?? new Date().toISOString(),
+      titulo: i === 0 ? 'Recebido no Centro de Coleta' : `Transporte para ${r.empresa_destino}`,
+      descricao: `${r.tipo_produto} — ${r.quantidade} unidade(s) — ${r.empresa_destino}`,
+    }));
     return {
-      produto: { ...produto },
-      lote: lote ? { ...lote } : null,
-      transportes,
+      produto,
+      lote: null,
+      transportes: rows.map((r: any) => ({
+        id: '',
+        loteId: '',
+        codigoEnvio: '',
+        cnpjRemetente: '',
+        cnpjDestinatario: r.empresa_destino ?? '',
+        dataRegistro: r.horario_entrega ?? '',
+      })),
       timeline,
-    } as LogisticaProduto;
+    };
   },
 };

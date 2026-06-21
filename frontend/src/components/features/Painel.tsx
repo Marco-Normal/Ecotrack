@@ -64,9 +64,9 @@ const Painel: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {resumo.ultimosLotes.map((l) => (
                   <div key={l.id} style={styles.loteRow}>
-                    <TagLabel>{l.numeroSerie}</TagLabel>
+                    <TagLabel>{l.nome || l.numeroSerie}</TagLabel>
                     <TipoBadge tipo={l.tipoProduto} />
-                    <span style={styles.loteRowMeta}>{l.produtosNumeroControle.length} produto(s)</span>
+                    <span style={styles.loteRowMeta}>{l.qtdProdutos ?? l.produtosNumeroControle.length} produto(s)</span>
                   </div>
                 ))}
               </div>

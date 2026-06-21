@@ -20,8 +20,10 @@ export interface Produto {
 export interface Lote {
   id: string;
   numeroSerie: string;
+  nome?: string;
   tipoProduto: TipoProduto;
   produtosNumeroControle: string[];
+  qtdProdutos?: number;
   dataCriacao: string;
 }
 
@@ -29,8 +31,11 @@ export interface Transporte {
   id: string;
   loteId: string;
   codigoEnvio: string;
+  nome?: string;
   cnpjRemetente: string;
   cnpjDestinatario: string;
+  nomeRemetente?: string;
+  nomeDestinatario?: string;
   dataRegistro: string;
 }
 
@@ -51,6 +56,7 @@ export interface ResumoPainel {
 export interface NovoTransporteInput {
   loteId: string;
   codigoEnvio: string;
+  nome?: string;
   cnpjRemetente: string;
   cnpjDestinatario: string;
 }

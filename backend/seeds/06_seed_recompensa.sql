@@ -1,0 +1,5 @@
+INSERT INTO recompensa (cpf, cnpj, tipo) VALUES
+('123.456.789-00', '11222333000181', 'Reciclavel'),
+('987.654.321-00', '22333444000192', 'Orgânico'),
+('456.789.123-00', '33444555000103', 'Tecnologia')
+ON CONFLICT DO NOTHING;

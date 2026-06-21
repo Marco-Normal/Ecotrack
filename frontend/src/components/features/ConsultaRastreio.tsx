@@ -77,7 +77,7 @@ const ConsultaRastreio: React.FC = () => {
 
           {/* Cabeçalho do lote encontrado */}
           <div style={styles.resultadoHeader}>
-            <TagLabel>{resultado.lote.numeroSerie}</TagLabel>
+            <TagLabel>{resultado.lote.nome || resultado.lote.numeroSerie}</TagLabel>
             <TipoBadge tipo={resultado.lote.tipoProduto} />
             <span style={styles.loteRowMeta}>
               criado em {new Date(resultado.lote.dataCriacao).toLocaleDateString('pt-BR')}
@@ -90,7 +90,7 @@ const ConsultaRastreio: React.FC = () => {
             <div style={styles.chipWrap}>
               {resultado.produtos.map((p) => (
                 <span key={p.numeroControle} style={styles.productChip}>
-                  {p.numeroControle}
+                  {p.nome}
                 </span>
               ))}
             </div>
@@ -123,15 +123,12 @@ const ConsultaRastreio: React.FC = () => {
                     {/* Conteúdo do evento */}
                     <div style={styles.timelineContent}>
                       <div style={styles.timelineTop}>
-                        <TagLabel>{t.codigoEnvio}</TagLabel>
-                        <span style={styles.loteRowMeta}>
-                          {new Date(t.dataRegistro).toLocaleString('pt-BR')}
-                        </span>
+                        <TagLabel>{t.nome || t.codigoEnvio}</TagLabel>
                       </div>
                       <div style={styles.timelineRoute}>
-                        <span>{t.cnpjRemetente}</span>
+                        <span>{t.nomeRemetente || t.cnpjRemetente}</span>
                         <span style={{ color: tokens.accent }}>→</span>
-                        <span>{t.cnpjDestinatario}</span>
+                        <span>{t.nomeDestinatario || t.cnpjDestinatario}</span>
                       </div>
                     </div>
                   </div>

@@ -16,11 +16,16 @@ import {
 
 const TIPOS_PRODUTO: TipoProduto[] = ['Reciclável', 'Orgânico', 'Tecnologia'];
 
+function gerarUUID(): string {
+  return crypto.randomUUID();
+}
+
 const CadastroLote: React.FC = () => {
   const [tipoSelecionado, setTipoSelecionado] = useState<TipoProduto | ''>('');
   const [produtos, setProdutos]               = useState<Produto[]>([]);
   const [selecionados, setSelecionados]       = useState<Set<string>>(new Set());
-  const [numeroSerie, setNumeroSerie]         = useState('');
+  const [numeroSerie]                         = useState(gerarUUID);
+  const [nomeLote, setNomeLote]               = useState('');
 
   const [isLoadingProdutos, setIsLoadingProdutos] = useState(false);
   const [isSubmitting, setIsSubmitting]           = useState(false);
@@ -65,10 +70,11 @@ const CadastroLote: React.FC = () => {
       const novoLote = await apiService.criarLote(
         numeroSerie,
         tipoSelecionado,
-        Array.from(selecionados)
+        Array.from(selecionados),
+        nomeLote
       );
       setSucesso(novoLote);
-      setNumeroSerie('');
+      setNomeLote('');
       setSelecionados(new Set());
       // Recarrega a lista para refletir os produtos que acabaram de entrar no lote
       const atualizados = await apiService.listarProdutosDisponiveisPorTipo(tipoSelecionado);
@@ -81,7 +87,7 @@ const CadastroLote: React.FC = () => {
   }
 
   const podeSalvar =
-    Boolean(tipoSelecionado) && selecionados.size > 0 && numeroSerie.trim().length > 0;
+    Boolean(tipoSelecionado) && selecionados.size > 0 && nomeLote.trim().length > 0;
 
   return (
     <SectionCard
@@ -131,7 +137,7 @@ const CadastroLote: React.FC = () => {
                       checked={selecionados.has(p.numeroControle)}
                       onChange={() => alternarProduto(p.numeroControle)}
                     />
-                    <span style={styles.checkboxLabel}>{p.numeroControle}</span>
+                    <span style={styles.checkboxLabel}>{p.nome}</span>
                   </label>
                 ))}
               </div>
@@ -139,16 +145,16 @@ const CadastroLote: React.FC = () => {
           </div>
         )}
 
-        {/* Passo 3 — número de série */}
+        {/* Passo 3 — nome do lote */}
         {tipoSelecionado && produtos.length > 0 && (
           <div style={styles.field}>
-            <label style={styles.label} htmlFor="numero-serie">3. Número de série do novo lote</label>
+            <label style={styles.label} htmlFor="nome-lote">3. Nome do lote</label>
             <input
-              id="numero-serie"
+              id="nome-lote"
               style={styles.input}
-              placeholder="ex.: LOTE-2026-001"
-              value={numeroSerie}
-              onChange={(e) => setNumeroSerie(e.target.value)}
+              placeholder="ex.: LOTE-ECO-2026-001"
+              value={nomeLote}
+              onChange={(e) => setNomeLote(e.target.value)}
             />
             <span style={styles.helperText}>{selecionados.size} produto(s) selecionado(s)</span>
           </div>
@@ -157,7 +163,7 @@ const CadastroLote: React.FC = () => {
         {erro && <StatusBanner variant="error">{erro}</StatusBanner>}
         {sucesso && (
           <StatusBanner variant="success">
-            Lote <strong>{sucesso.numeroSerie}</strong> criado com{' '}
+            Lote <strong>{sucesso.nome || sucesso.numeroSerie}</strong> criado com{' '}
             {sucesso.produtosNumeroControle.length} produto(s).
           </StatusBanner>
         )}

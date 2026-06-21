@@ -21,7 +21,8 @@ const CadastroTransporte: React.FC = () => {
   const [isLoadingLotes, setIsLoadingLotes] = useState(true);
 
   const [loteId, setLoteId]                     = useState('');
-  const [codigoEnvio, setCodigoEnvio]           = useState('');
+  const [codigoEnvio]                           = useState(crypto.randomUUID());
+  const [nomeTransporte, setNomeTransporte]     = useState('');
   const [cnpjRemetente, setCnpjRemetente]       = useState('');
   const [cnpjDestinatario, setCnpjDestinatario] = useState('');
 
@@ -50,11 +51,12 @@ const CadastroTransporte: React.FC = () => {
       const novo = await apiService.criarTransporte({
         loteId,
         codigoEnvio,
+        nome: nomeTransporte,
         cnpjRemetente,
         cnpjDestinatario,
       });
       setSucesso(novo);
-      setCodigoEnvio('');
+      setNomeTransporte('');
       setCnpjRemetente('');
       setCnpjDestinatario('');
     } catch (err) {
@@ -67,7 +69,7 @@ const CadastroTransporte: React.FC = () => {
   const loteSelecionado = lotes.find((l) => l.id === loteId) ?? null;
   const podeSalvar =
     Boolean(loteId) &&
-    codigoEnvio.trim().length > 0 &&
+    nomeTransporte.trim().length > 0 &&
     cnpjRemetente.trim().length > 0 &&
     cnpjDestinatario.trim().length > 0;
 
@@ -97,7 +99,7 @@ const CadastroTransporte: React.FC = () => {
               <option value="">Selecione um lote...</option>
               {lotes.map((l) => (
                 <option key={l.id} value={l.id}>
-                  {l.numeroSerie} — {l.tipoProduto} ({l.produtosNumeroControle.length} produtos)
+                  {l.nome || l.numeroSerie} — {l.tipoProduto} ({l.qtdProdutos ?? l.produtosNumeroControle.length} produtos)
                 </option>
               ))}
             </select>
@@ -108,15 +110,15 @@ const CadastroTransporte: React.FC = () => {
             )}
           </div>
 
-          {/* Passo 2 — código de envio */}
+          {/* Passo 2 — nome do transporte */}
           <div style={styles.field}>
-            <label style={styles.label} htmlFor="codigo-envio">2. Código de envio</label>
+            <label style={styles.label} htmlFor="nome-transporte">2. Nome do transporte</label>
             <input
-              id="codigo-envio"
+              id="nome-transporte"
               style={styles.input}
-              placeholder="ex.: ENV-58213"
-              value={codigoEnvio}
-              onChange={(e) => setCodigoEnvio(e.target.value)}
+              placeholder="ex.: ENV-ECO-2026-001"
+              value={nomeTransporte}
+              onChange={(e) => setNomeTransporte(e.target.value)}
             />
           </div>
 
@@ -147,7 +149,7 @@ const CadastroTransporte: React.FC = () => {
           {erro && <StatusBanner variant="error">{erro}</StatusBanner>}
           {sucesso && (
             <StatusBanner variant="success">
-              Transporte <strong>{sucesso.codigoEnvio}</strong> registrado com sucesso.
+              Transporte <strong>{sucesso.nome || sucesso.codigoEnvio}</strong> registrado com sucesso.
             </StatusBanner>
           )}
 

@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS dentroLote(
        produto UUID NOT NULL,
        nroSerie UUID NOT NULL,
-       CONSTRAINT dentroLote_fk PRIMARY KEY(produto, nroSerie)
+       CONSTRAINT dentroLote_fk PRIMARY KEY(produto, nroSerie),
        CONSTRAINT lote_dentroLote_fk
            FOREIGN KEY(nroSerie)
            REFERENCES lote(nroSerie)

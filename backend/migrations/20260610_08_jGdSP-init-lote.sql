@@ -3,6 +3,6 @@
 CREATE TABLE IF NOT EXISTS lote(
        nroSerie UUID DEFAULT gen_random_uuid(),
        tipo VARCHAR NOT NULL,
-       dataHora TIMESTAMPZ NOT NULL DEFAULT NOW()
+       dataHora TIMESTAMPTZ NOT NULL DEFAULT NOW(),
        CONSTRAINT lote_pk PRIMARY KEY(nroSerie)
 );
