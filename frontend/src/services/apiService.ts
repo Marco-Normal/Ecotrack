@@ -203,4 +203,24 @@ export const apiService: ApiService = {
       timeline,
     };
   },
+  // ... (dentro de export const apiService: ApiService = { ... )
+
+  async buscarCidadao(cpf: string) {
+    const { data } = await API.get(`/api/cidadao/${cpf}`);
+    return data;
+  },
+
+  async listarEstoque() {
+    const { data } = await API.get('/api/estoque');
+    return data;
+  },
+
+  async realizarResgate(cpf: string, cnpj: string, tipo: string) {
+    const { data } = await API.post('/api/resgatar', {
+      cpf,
+      cnpj: cnpj.replace(/\D/g, ''), // Limpa máscara de CNPJ se vier
+      tipo: TIPO_BACKEND[tipo] ?? tipo,
+    });
+    return data;
+  },
 };

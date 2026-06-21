@@ -290,3 +290,66 @@ class PgPool:
                     ORDER BY media_quantidade_reciclada DESC
                 """)
                 return cur.fetchall()
+            
+# Queries para resgate de créditos ─────────────────────────
+
+    def cidadao_por_cpf(self, cpf: str):
+        """Busca os dados e saldo atual do cidadão."""
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT cpf, nome, creditos FROM pessoa WHERE cpf = %s", (cpf,))
+                return cur.fetchone()
+
+    def listar_estoque_resgate(self):
+        """Lista opções de resgate que possuem quantidade > 0."""
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT e.cnpj, emp.nome, e.tipo, e.valor, e.quantidade 
+                    FROM estoque e
+                    INNER JOIN empresas emp ON e.cnpj = emp.cnpj
+                    WHERE e.quantidade > 0
+                """)
+                return cur.fetchall()
+
+    def executar_resgate_transacao(self, cpf: str, cnpj: str, tipo_estoque: str):
+        """Transação ACID blindada para resgate de créditos."""
+        with self._conn() as conn:
+            # O bloco with conn.transaction() garante o COMMIT ou ROLLBACK automático
+            with conn.transaction():
+                with conn.cursor() as cur:
+                    
+                    # 1. Trava a linha da pessoa (FOR UPDATE) e checa o saldo
+                    cur.execute("SELECT creditos FROM pessoa WHERE cpf = %s FOR UPDATE", (cpf,))
+                    pessoa = cur.fetchone()
+                    if not pessoa:
+                        raise ValueError("Cidadão não encontrado.")
+                    saldo_atual = pessoa[0]
+
+                    # 2. Trava a linha do estoque (FOR UPDATE) e checa disponibilidade
+                    cur.execute("""
+                        SELECT quantidade, valor FROM estoque 
+                        WHERE cnpj = %s AND tipo = %s FOR UPDATE
+                    """, (cnpj, tipo_estoque))
+                    estoque = cur.fetchone()
+                    if not estoque:
+                        raise ValueError("Estoque não encontrado.")
+                    
+                    qtd_atual, valor_custo = estoque
+                    
+                    # Validações de negócio
+                    if qtd_atual <= 0:
+                        raise ValueError("Estoque esgotado para este item.")
+                    if saldo_atual < valor_custo:
+                        raise ValueError(f"Saldo insuficiente. Você tem {saldo_atual} créditos e precisa de {valor_custo}.")
+
+                    # 3. Debita os créditos da Pessoa
+                    cur.execute("UPDATE pessoa SET creditos = creditos - %s WHERE cpf = %s", (valor_custo, cpf))
+
+                    # 4. Reduz o estoque da Empresa
+                    cur.execute("UPDATE estoque SET quantidade = quantidade - 1 WHERE cnpj = %s AND tipo = %s", (cnpj, tipo_estoque))
+
+                    # 5. Registra o histórico da Recompensa
+                    cur.execute("INSERT INTO recompensa (cpf, cnpj, tipo) VALUES (%s, %s, %s)", (cpf, cnpj, tipo_estoque))
+                    
+                    return {"sucesso": True, "novo_saldo": saldo_atual - valor_custo}

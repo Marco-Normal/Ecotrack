@@ -97,6 +97,11 @@ class CriarTransporteInput(BaseModel):
     remetente: str
     lote: uuid.UUID
 
+class ResgateInput(BaseModel):
+    cpf: str
+    cnpj: str
+    tipo: str
+
 # ── Produtos ──────────────────────────────────────────────────────────
 
 @app.get("/api/produtos", response_model=List[ProdutoSchema])
@@ -198,6 +203,35 @@ async def resumo(db: PgPool = Depends(get_db)):
         "empresas_todos_tipos": db.empresas_transportaram_todos_tipos_produto(),
         "cidadaos_acima_media": db.cidados_acima_media_quantidade()
     }
+
+# endpoints para resgate de créditos
+
+@app.get("/api/cidadao/{cpf}")
+async def buscar_cidadao(cpf: str, db: PgPool = Depends(get_db)):
+    row = db.cidadao_por_cpf(cpf)
+    if not row:
+        raise HTTPException(status_code=404, detail="Cidadão não encontrado")
+    return dict(zip(["cpf", "nome", "creditos"], row))
+
+@app.get("/api/estoque")
+async def listar_estoque(db: PgPool = Depends(get_db)):
+    rows = db.listar_estoque_resgate()
+    if not rows:
+        return []
+    return [dict(zip(["cnpj", "empresa_nome", "tipo", "valor", "quantidade"], r)) for r in rows]
+
+@app.post("/api/resgatar")
+async def resgatar_creditos(input: ResgateInput, db: PgPool = Depends(get_db)):
+    tipo_db = normalizar_tipo(input.tipo)
+    try:
+        resultado = db.executar_resgate_transacao(input.cpf, input.cnpj, tipo_db)
+        return resultado
+    except ValueError as e:
+        # Pega as exceções de saldo e estoque que lançamos no queries.py
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Erro interno na transação.")
+    
 
 if __name__ == "__main__":
     import uvicorn

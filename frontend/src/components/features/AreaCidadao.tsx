@@ -1,10 +1,11 @@
 // ============================================================================
 //  FEATURE: ÁREA DO CIDADÃO
 //
-//  Fluxo em 3 passos:
+//  Fluxo em 4 passos:
 //    1. O cidadão digita seu CPF e clica em "Acessar Meus Descartes"
-//    2. A lista de produtos descartados é exibida
-//    3. Ao clicar num produto, a linha do tempo logística é exibida inline
+//    2. (NOVO) O painel de créditos e recompensas disponíveis é exibido
+//    3. A lista de produtos descartados é exibida
+//    4. Ao clicar num produto, a linha do tempo logística é exibida inline
 // ============================================================================
 
 import React, { useState } from 'react';
@@ -266,6 +267,13 @@ const AreaCidadao: React.FC = () => {
   const [isLoadingProdutos, setIsLoadingProdutos] = useState(false);
   const [erroProdutos, setErroProdutos] = useState<string | null>(null);
 
+  // ESTADOS DA NOVA TRANSAÇÃO
+  const [cidadao, setCidadao] = useState<{ cpf: string; nome: string; creditos: number } | null>(null);
+  const [estoque, setEstoque] = useState<any[]>([]);
+  const [erroCidadao, setErroCidadao] = useState<string | null>(null);
+  const [sucessoResgate, setSucessoResgate] = useState<string | null>(null);
+  const [isResgatando, setIsResgatando] = useState(false);
+
   // Passo 2 — lista de produtos
   const [produtos, setProdutos] = useState<Produto[] | null>(null);
 
@@ -283,13 +291,54 @@ const AreaCidadao: React.FC = () => {
     setProdutoSelecionado(null);
     setLogistica(null);
 
+    // Reseta o painel de resgate
+    setCidadao(null);
+    setErroCidadao(null);
+    setSucessoResgate(null);
+
     try {
+      // Carrega os descartes
       const lista = await apiService.buscarProdutosPorCpf(cpf);
       setProdutos(lista);
+
+      // Carrega os dados do cidadão e o estoque simultaneamente
+      try {
+        const dadosCidadao = await apiService.buscarCidadao(cpf);
+        setCidadao(dadosCidadao);
+        const dadosEstoque = await apiService.listarEstoque();
+        setEstoque(dadosEstoque);
+      } catch (errC) {
+        setErroCidadao('Não foi possível carregar os créditos ou as opções de resgate disponíveis.');
+      }
+
     } catch (err) {
       setErroProdutos(err instanceof Error ? err.message : 'Erro ao buscar descartes.');
     } finally {
       setIsLoadingProdutos(false);
+    }
+  }
+
+  // NOVA FUNÇÃO DE TRANSAÇÃO: Resgatar Recompensa
+  async function handleResgatar(cnpj: string, tipo: string) {
+    if (!cidadao) return;
+    setErroCidadao(null);
+    setSucessoResgate(null);
+    setIsResgatando(true);
+    
+    try {
+      const res = await apiService.realizarResgate(cidadao.cpf, cnpj, tipo);
+      setSucessoResgate('Resgate processado com sucesso! Verifique seu email para mais detalhes.');
+      
+      // Atualiza o saldo localmente sem recarregar a tela (melhor UX)
+      setCidadao({ ...cidadao, creditos: res.novo_saldo });
+      
+      // Atualiza o estoque para refletir a redução no backend
+      const dadosEstoque = await apiService.listarEstoque();
+      setEstoque(dadosEstoque);
+    } catch (err: any) {
+      setErroCidadao(err.message || 'Erro ao realizar o resgate.');
+    } finally {
+      setIsResgatando(false);
     }
   }
 
@@ -320,7 +369,7 @@ const AreaCidadao: React.FC = () => {
     <SectionCard
       icon={<IconUser size={20} />}
       title="Área do Cidadão"
-      description="Digite seu CPF para visualizar todos os seus produtos descartados e acompanhar o rastreamento de cada um."
+      description="Digite seu CPF para consultar seus descartes, acompanhar rastreamentos e resgatar recompensas."
     >
       {/* Passo 1: formulário de CPF */}
       <form onSubmit={handleBuscar} style={styles.formGrid}>
@@ -338,6 +387,7 @@ const AreaCidadao: React.FC = () => {
                 setProdutoSelecionado(null);
                 setLogistica(null);
                 setErroProdutos(null);
+                setCidadao(null);
               }}
             />
           </div>
@@ -346,7 +396,7 @@ const AreaCidadao: React.FC = () => {
             loading={isLoadingProdutos}
             disabled={cpf.replace(/\D/g, '').length < 11}
           >
-            <IconUser size={15} /> Acessar Meus Descartes
+            <IconUser size={15} /> Acessar Painel
           </PrimaryButton>
         </div>
 
@@ -361,7 +411,7 @@ const AreaCidadao: React.FC = () => {
 
       {isLoadingProdutos && (
         <div style={{ marginTop: 20 }}>
-          <StatusBanner variant="loading">Consultando seus descartes...</StatusBanner>
+          <StatusBanner variant="loading">Consultando seus dados...</StatusBanner>
         </div>
       )}
 
@@ -371,7 +421,65 @@ const AreaCidadao: React.FC = () => {
         </div>
       )}
 
-      {/* Passo 2: lista de produtos */}
+      {/* NOVO PASSO: Painel de Resgate */}
+      {cidadao && (
+        <div className="ecotrack-fade-in" style={{ marginTop: 28, padding: 20, border: `1.5px solid ${tokens.primarySoft}`, borderRadius: tokens.radius, background: tokens.surfaceAlt }}>
+          <h3 style={{ ...styles.subheading, margin: '0 0 8px 0', color: tokens.primaryDark }}>
+            Bem-vindo(a), {cidadao.nome}
+          </h3>
+          <p style={{ margin: '0 0 16px 0', fontSize: 16 }}>
+            Seu saldo disponível: <strong style={{ color: tokens.primary, fontSize: 18 }}> {cidadao.creditos} Créditos</strong>
+          </p>
+
+          {erroCidadao && <div style={{ marginBottom: 16 }}><StatusBanner variant="error">{erroCidadao}</StatusBanner></div>}
+          
+          {sucessoResgate && (
+            <div style={{ marginBottom: 16, padding: '12px 16px', background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0', borderRadius: tokens.radiusSm, fontWeight: 600, fontSize: 14 }}>
+              <IconCheck size={16} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+              {sucessoResgate}
+            </div>
+          )}
+
+          {estoque.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: 14, color: tokens.inkMuted, fontWeight: 600 }}>Recompensas Disponíveis</h4>
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
+                {estoque.map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 12, border: `1px solid ${tokens.line}`, borderRadius: tokens.radiusSm, background: tokens.surface }}>
+                    <div>
+                      <strong style={{ display: 'block', fontSize: 14, color: tokens.ink }}>{item.empresa_nome}</strong>
+                      <span style={{ fontSize: 13, color: tokens.inkMuted }}>{item.tipo} | Restam: {item.quantidade} unidades</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontWeight: 700, color: tokens.accent, fontSize: 14 }}>{item.valor} pts</span>
+                      <button
+                        disabled={isResgatando || cidadao.creditos < item.valor}
+                        onClick={() => handleResgatar(item.cnpj, item.tipo)}
+                        style={{
+                          padding: '6px 14px',
+                          border: 'none',
+                          borderRadius: tokens.radiusSm,
+                          background: cidadao.creditos >= item.valor ? tokens.primary : tokens.lineStrong,
+                          color: cidadao.creditos >= item.valor ? 'white' : tokens.inkMuted,
+                          cursor: cidadao.creditos >= item.valor ? 'pointer' : 'not-allowed',
+                          fontWeight: 600,
+                          fontSize: 13,
+                          fontFamily: 'inherit',
+                          transition: 'background 0.2s'
+                        }}
+                      >
+                        {isResgatando ? 'Aguarde...' : 'Resgatar'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Passo 3: lista de produtos originais */}
       {produtos && produtos.length > 0 && (
         <div className="ecotrack-fade-in" style={{ marginTop: 28 }}>
           <div style={{ marginBottom: 14 }}>
@@ -393,7 +501,7 @@ const AreaCidadao: React.FC = () => {
                   onSelecionar={() => handleSelecionarProduto(produto.numeroControle)}
                 />
 
-                {/* Passo 3: timeline inline sob o produto selecionado */}
+                {/* Passo 4: timeline inline sob o produto selecionado */}
                 {produtoSelecionado === produto.numeroControle && !isLoadingLogistica && erroLogistica && (
                   <div style={{ marginTop: 8 }}>
                     <StatusBanner variant="error">{erroLogistica}</StatusBanner>

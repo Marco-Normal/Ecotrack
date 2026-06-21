@@ -100,4 +100,8 @@ export interface ApiService {
   buscarProdutosPorCpf(cpf: string): Promise<Produto[]>;
   /** Área do Cidadão: retorna a linha do tempo logística completa de um produto. */
   obterLogisticaProduto(numeroControle: string): Promise<LogisticaProduto>;
+  // para restade dos credtios
+  buscarCidadao: (cpf: string) => Promise<{ cpf: string; nome: string; creditos: number }>;
+  listarEstoque: () => Promise<{ cnpj: string; empresa_nome: string; tipo: string; valor: number; quantidade: number }[]>;
+  realizarResgate: (cpf: string, cnpj: string, tipo: string) => Promise<{ sucesso: boolean; novo_saldo: number }>;
 }
