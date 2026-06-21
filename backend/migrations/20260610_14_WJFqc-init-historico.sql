@@ -9,4 +9,6 @@ CREATE TABLE IF NOT EXISTS historico(
        CONSTRAINT tran_historico_fk
            FOREIGN KEY (codEnvio)
            REFERENCES transporte(codEnvio)
+           ON DELETE RESTRICT
+           ON UPDATE CASCADE
 );

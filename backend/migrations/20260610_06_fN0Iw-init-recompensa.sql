@@ -10,8 +10,12 @@ CREATE TABLE IF NOT EXISTS recompensa(
        CONSTRAINT recompensa_pk PRIMARY KEY(id),
        CONSTRAINT rec_pessoa_fk
            FOREIGN KEY(cpf)
-           REFERENCES pessoa(cpf),
+           REFERENCES pessoa(cpf)
+           ON DELETE CASCADE
+           ON UPDATE CASCADE,
        CONSTRAINT rec_estoque_fk
            FOREIGN KEY(tipo, cnpj)
            REFERENCES estoque(tipo, cnpj)
+           ON DELETE CASCADE
+           ON UPDATE CASCADE
 )

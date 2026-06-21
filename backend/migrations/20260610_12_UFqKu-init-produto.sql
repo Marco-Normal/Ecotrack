@@ -10,8 +10,12 @@ CREATE TABLE IF NOT EXISTS produto(
        CONSTRAINT produto_pk PRIMARY KEY(nroControle),
        CONSTRAINT cc_produto_fk
            FOREIGN KEY(centroColeta)
-           REFERENCES centroColeta(cnpj),
+           REFERENCES centroColeta(cnpj)
+           ON DELETE SET NULL
+           ON UPDATE CASCADE,
        CONSTRAINT pess_produto_fk
            FOREIGN KEY(pessoa)
            REFERENCES pessoa(cpf)
+           ON DELETE CASCADE
+           ON UPDATE CASCADE
 )

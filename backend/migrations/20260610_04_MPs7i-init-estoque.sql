@@ -9,4 +9,6 @@ CREATE TABLE IF NOT EXISTS estoque(
        CONSTRAINT est_empresa_fk
            FOREIGN KEY(cnpj)
            REFERENCES empresas(cnpj)
+           ON DELETE CASCADE
+           ON UPDATE CASCADE
 );
