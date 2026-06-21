@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS produto(
        tipo tipo NOT NULL,
        pessoa CHAR(14) NOT NULL,
        qtd INT NOT NULL,
+       nome VARCHAR NOT NULL, 
        CONSTRAINT produto_pk PRIMARY KEY(nroControle),
        CONSTRAINT cc_produto_fk
            FOREIGN KEY(centroColeta)
