@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS recompensa(
        CONSTRAINT rec_pessoa_fk
            FOREIGN KEY(cpf)
            REFERENCES pessoa(cpf)
-           ON DELETE SET NULL
+           ON DELETE RESTRICT
            ON UPDATE CASCADE,
        CONSTRAINT rec_estoque_fk
            FOREIGN KEY(tipo, cnpj)
