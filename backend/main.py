@@ -26,9 +26,11 @@ app.add_middleware(
 
 
 def get_db():
-    pool = PgPool(user=os.getenv("DB_USER", "postgres"),
-                  password=os.getenv("DB_PASSWORD", "postgres"),
-                  dbname=os.getenv("DB_NAME", "ecotrack"))
+    pool = PgPool(
+        user=os.getenv("DB_USER", "postgres"),
+        password=os.getenv("DB_PASSWORD", "postgres"),
+        dbname=os.getenv("DB_NAME", "ecotrack"),
+    )
     try:
         yield pool
     finally:
@@ -110,26 +112,19 @@ class CriarTransporteInput(BaseModel):
     lote: uuid.UUID
 
 
-<< << << < variant A
-
-
 class ResgateInput(BaseModel):
     cpf: str
     cnpj: str
-
-
->>>>>> > variant B
+    tipo: str
 
 
 class CriarProdutoInput(BaseModel):
     nome: str
+    tipo: str
+    qtd: int
+    pessoa: str
+    creditos: int
 
-
-== == == = end
-tipo: str
-qtd: int
-pessoa: str
-creditos: int
 
 # ── Produtos ──────────────────────────────────────────────────────────
 
@@ -144,7 +139,25 @@ async def listar_produtos(tipo: Optional[str] = None, db: PgPool = Depends(get_d
     if not rows:
         raise HTTPException(
             status_code=404, detail="Nenhum produto encontrado")
-    return [ProdutoSchema(**dict(zip(["nroControle", "nome", "centroColeta", "dataHora", "tipo", "pessoa", "qtd"], r))) for r in rows]
+    return [
+        ProdutoSchema(
+            **dict(
+                zip(
+                    [
+                        "nroControle",
+                        "nome",
+                        "centroColeta",
+                        "dataHora",
+                        "tipo",
+                        "pessoa",
+                        "qtd",
+                    ],
+                    r,
+                )
+            )
+        )
+        for r in rows
+    ]
 
 
 @app.post("/api/produtos", response_model=ProdutoSchema)
@@ -159,10 +172,26 @@ async def criar_produto(input: CriarProdutoInput, db: PgPool = Depends(get_db)):
     tipo_db = normalizar_tipo(input.tipo)
     nro_controle = uuid.uuid4()
     produto = db.inserir_produto(
-        nro_controle, input.nome, tipo_db, input.pessoa, input.qtd, input.creditos)
+        nro_controle, input.nome, tipo_db, input.pessoa, input.qtd, input.creditos
+    )
     if not produto:
         raise HTTPException(status_code=500, detail="Falha ao criar produto")
-    return ProdutoSchema(**dict(zip(["nroControle", "nome", "centroColeta", "dataHora", "tipo", "pessoa", "qtd"], produto)))
+    return ProdutoSchema(
+        **dict(
+            zip(
+                [
+                    "nroControle",
+                    "nome",
+                    "centroColeta",
+                    "dataHora",
+                    "tipo",
+                    "pessoa",
+                    "qtd",
+                ],
+                produto,
+            )
+        )
+    )
 
 
 @app.get("/api/produtos/{cpf}", response_model=List[ProdutoSchema])
@@ -178,7 +207,25 @@ async def produtos_por_cpf(cpf: str, db: PgPool = Depends(get_db)):
     if not rows:
         raise HTTPException(
             status_code=404, detail="Nenhum produto para este CPF")
-    return [ProdutoSchema(**dict(zip(["nroControle", "nome", "centroColeta", "dataHora", "tipo", "pessoa", "qtd"], r))) for r in rows]
+    return [
+        ProdutoSchema(
+            **dict(
+                zip(
+                    [
+                        "nroControle",
+                        "nome",
+                        "centroColeta",
+                        "dataHora",
+                        "tipo",
+                        "pessoa",
+                        "qtd",
+                    ],
+                    r,
+                )
+            )
+        )
+        for r in rows
+    ]
 
 
 @app.get("/api/produtos/{numeroControle}/logistica")
@@ -186,9 +233,15 @@ async def logistica(numeroControle: uuid.UUID, db: PgPool = Depends(get_db)):
     rows = db.timeline_logistica(numeroControle)
     if not rows:
         raise HTTPException(status_code=404, detail="Timeline não encontrada")
-    keys = ["nome_cidadao", "tipo_produto", "quantidade",
-            "empresa_destino", "horario_entrega"]
+    keys = [
+        "nome_cidadao",
+        "tipo_produto",
+        "quantidade",
+        "empresa_destino",
+        "horario_entrega",
+    ]
     return [dict(zip(keys, r)) for r in rows]
+
 
 # ── Lotes ────────────────────────────────────────────────────────────
 
@@ -198,7 +251,12 @@ async def listar_lotes(db: PgPool = Depends(get_db)):
     rows = db.listar_lotes()
     if not rows:
         raise HTTPException(status_code=404, detail="Nenhum lote encontrado")
-    return [LoteSchema(**dict(zip(["nroSerie", "nome", "tipo", "dataHora", "qtd_produtos"], r))) for r in rows]
+    return [
+        LoteSchema(
+            **dict(zip(["nroSerie", "nome", "tipo", "dataHora", "qtd_produtos"], r))
+        )
+        for r in rows
+    ]
 
 
 @app.get("/api/lotes/{nroSerie}/produtos")
@@ -221,6 +279,7 @@ async def criar_lote(input: CriarLoteInput, db: PgPool = Depends(get_db)):
             pass
     return LoteSchema(**dict(zip(["nroSerie", "nome", "tipo", "dataHora"], lote)))
 
+
 # ── Transportes ──────────────────────────────────────────────────────
 
 
@@ -228,11 +287,15 @@ async def criar_lote(input: CriarLoteInput, db: PgPool = Depends(get_db)):
 async def criar_transporte(input: CriarTransporteInput, db: PgPool = Depends(get_db)):
     cod_envio = input.codEnvio or uuid.uuid4()
     res = db.inserir_transporte(
-        cod_envio, input.nome, input.destinatario, input.remetente, input.lote)
+        cod_envio, input.nome, input.destinatario, input.remetente, input.lote
+    )
     if not res:
         raise HTTPException(
             status_code=500, detail="Falha ao criar transporte")
-    return TransporteSchema(**dict(zip(["codEnvio", "nome", "destinatario", "remetente", "lote"], res)))
+    return TransporteSchema(
+        **dict(zip(["codEnvio", "nome", "destinatario", "remetente", "lote"], res))
+    )
+
 
 # ── Rastreio ─────────────────────────────────────────────────────────
 
@@ -243,6 +306,7 @@ async def rastrear(termo: str, db: PgPool = Depends(get_db)):
     if not data:
         raise HTTPException(status_code=404, detail="Lote não encontrado")
     return data
+
 
 # ── Resumo ───────────────────────────────────────────────────────────
 
@@ -258,14 +322,18 @@ async def resumo(db: PgPool = Depends(get_db)):
             "total_produtos": base[0],
             "total_lotes": base[1],
             "total_transportes": base[2],
-            "produtos_disponiveis": base[3]
+            "produtos_disponiveis": base[3],
         },
-        "ultimos_lotes": [dict(zip(["nroSerie", "nome", "tipo", "dataHora", "qtd_produtos"], l)) for l in lotes],
+        "ultimos_lotes": [
+            dict(zip(["nroSerie", "nome", "tipo", "dataHora", "qtd_produtos"], l))
+            for l in lotes
+        ],
         "empresas_maior_media": db.empresas_t_maior_media(),
         "desempenho_recompensa": db.desempenho_recompensa(),
         "empresas_todos_tipos": db.empresas_transportaram_todos_tipos_produto(),
-        "cidadaos_acima_media": db.cidados_acima_media_quantidade()
+        "cidadaos_acima_media": db.cidados_acima_media_quantidade(),
     }
+
 
 # endpoints para resgate de créditos
 
@@ -283,7 +351,10 @@ async def listar_estoque(db: PgPool = Depends(get_db)):
     rows = db.listar_estoque_resgate()
     if not rows:
         return []
-    return [dict(zip(["cnpj", "empresa_nome", "tipo", "valor", "quantidade"], r)) for r in rows]
+    return [
+        dict(zip(["cnpj", "empresa_nome", "tipo", "valor", "quantidade"], r))
+        for r in rows
+    ]
 
 
 @app.post("/api/resgatar")
@@ -303,4 +374,5 @@ async def resgatar_creditos(input: ResgateInput, db: PgPool = Depends(get_db)):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
