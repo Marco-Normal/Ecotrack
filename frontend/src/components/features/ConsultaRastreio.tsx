@@ -50,7 +50,6 @@ const ConsultaRastreio: React.FC = () => {
       <form onSubmit={handleSubmit} style={{ ...styles.formGrid, marginBottom: 8 }}>
         <div className="ecotrack-field-row" style={styles.fieldRow}>
           <div style={{ ...styles.field, flex: 2 }}>
-            <label style={styles.label} htmlFor="busca-lote">Número de série do lote</label>
             <input
               id="busca-lote"
               style={styles.input}
