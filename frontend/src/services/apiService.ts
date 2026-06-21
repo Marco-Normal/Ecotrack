@@ -4,21 +4,18 @@
 //  Os arrays abaixo simulam tabelas de banco de dados.
 //  Para substituir por um backend real, reescreva o corpo de cada função
 //  usando fetch() / axios — os componentes dependem apenas de ApiService.
-//
-//  Exemplo de migração:
-//
-//    criarLote: async (numeroSerie, tipoProduto, numerosControle) => {
-//      const res = await fetch('/api/lotes', {
-//        method: 'POST',
-//        headers: { 'Content-Type': 'application/json' },
-//        body: JSON.stringify({ numeroSerie, tipoProduto, numerosControle }),
-//      });
-//      if (!res.ok) throw new Error((await res.json()).message);
-//      return res.json();
-//    }
 // ============================================================================
 
-import type { ApiService, Lote, Produto, Transporte, NovoTransporteInput, TipoProduto } from '../types';
+import type {
+  ApiService,
+  EventoLogistico,
+  LogisticaProduto,
+  Lote,
+  Produto,
+  Transporte,
+  NovoTransporteInput,
+  TipoProduto,
+} from '../types';
 
 // ---------- helpers internos -------------------------------------------------
 
@@ -36,17 +33,55 @@ function normalizarDigitos(valor: string): string {
 }
 
 // ---------- "banco de dados" em memória -------------------------------------
+//  Produtos agora possuem pessoaCpf e dataDescarte para suportar a Área do
+//  Cidadão. CPF de teste: '123.456.789-00' e '987.654.321-00'.
 
 let _produtos: Produto[] = [
-  { numeroControle: 'REC-7741', tipo: 'Reciclável' },
-  { numeroControle: 'REC-7742', tipo: 'Reciclável' },
+  // -- Recicláveis do cidadão 1 (CPF 123.456.789-00)
+  {
+    numeroControle: 'REC-7741',
+    tipo: 'Reciclável',
+    pessoaCpf: '123.456.789-00',
+    dataDescarte: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), // 10 dias atrás
+  },
+  {
+    numeroControle: 'REC-7742',
+    tipo: 'Reciclável',
+    pessoaCpf: '123.456.789-00',
+    dataDescarte: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  // -- Recicláveis sem CPF (descarte anônimo)
   { numeroControle: 'REC-7743', tipo: 'Reciclável' },
   { numeroControle: 'REC-7744', tipo: 'Reciclável' },
-  { numeroControle: 'ORG-3310', tipo: 'Orgânico' },
-  { numeroControle: 'ORG-3311', tipo: 'Orgânico' },
+  // -- Orgânicos do cidadão 1
+  {
+    numeroControle: 'ORG-3310',
+    tipo: 'Orgânico',
+    pessoaCpf: '123.456.789-00',
+    dataDescarte: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  // -- Orgânicos do cidadão 2 (CPF 987.654.321-00)
+  {
+    numeroControle: 'ORG-3311',
+    tipo: 'Orgânico',
+    pessoaCpf: '987.654.321-00',
+    dataDescarte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+  },
   { numeroControle: 'ORG-3312', tipo: 'Orgânico' },
-  { numeroControle: 'TEC-9001', tipo: 'Tecnologia' },
-  { numeroControle: 'TEC-9002', tipo: 'Tecnologia' },
+  // -- Tecnologia do cidadão 1
+  {
+    numeroControle: 'TEC-9001',
+    tipo: 'Tecnologia',
+    pessoaCpf: '123.456.789-00',
+    dataDescarte: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  // -- Tecnologia do cidadão 2
+  {
+    numeroControle: 'TEC-9002',
+    tipo: 'Tecnologia',
+    pessoaCpf: '987.654.321-00',
+    dataDescarte: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
   { numeroControle: 'TEC-9003', tipo: 'Tecnologia' },
 ];
 
@@ -173,5 +208,97 @@ export const apiService: ApiService = {
       totalTransportes: _transportes.length,
       ultimosLotes,
     };
+  },
+
+  // ---------- Área do Cidadão ------------------------------------------------
+
+  async buscarProdutosPorCpf(cpf: string) {
+    await delayDeRede();
+
+    const cpfLimpo = cpf.trim();
+    if (!cpfLimpo) throw new Error('Digite o seu CPF para consultar os descartes.');
+
+    // Aceita com ou sem formatação
+    const digitos = normalizarDigitos(cpfLimpo);
+    if (digitos.length !== 11) {
+      throw new Error('CPF inválido. Certifique-se de digitar os 11 dígitos corretamente.');
+    }
+
+    const encontrados = _produtos.filter(
+      (p) => p.pessoaCpf && normalizarDigitos(p.pessoaCpf) === digitos
+    );
+
+    if (encontrados.length === 0) {
+      throw new Error(
+        'Nenhum descarte encontrado para este CPF. Verifique o número digitado ou entre em contato com o ponto de coleta.'
+      );
+    }
+
+    return encontrados.map((p) => ({ ...p }));
+  },
+
+  async obterLogisticaProduto(numeroControle: string) {
+    await delayDeRede();
+
+    const produto = _produtos.find((p) => p.numeroControle === numeroControle);
+    if (!produto) throw new Error(`Produto "${numeroControle}" não encontrado.`);
+
+    // JOIN: produto → lote → transportes
+    const lote = produto.loteId
+      ? (_lotes.find((l) => l.id === produto.loteId) ?? null)
+      : null;
+
+    const transportes = lote
+      ? _transportes
+          .filter((t) => t.loteId === lote.id)
+          .sort((a, b) => a.dataRegistro.localeCompare(b.dataRegistro))
+          .map((t) => ({ ...t }))
+      : [];
+
+    // Monta a timeline de eventos logísticos
+    const timeline: EventoLogistico[] = [];
+
+    // Evento 1: coleta no centro
+    timeline.push({
+      tipo: 'coleta',
+      data: produto.dataDescarte ?? new Date().toISOString(),
+      titulo: 'Recebido no Centro de Coleta',
+      descricao: `Produto ${produto.numeroControle} (${produto.tipo}) entregue e registrado no sistema.`,
+    });
+
+    if (!lote) {
+      // Produto ainda aguarda formação de lote
+      timeline.push({
+        tipo: 'aguardando',
+        data: new Date().toISOString(),
+        titulo: 'Aguardando Formação de Lote',
+        descricao: 'Seu produto foi recebido e está aguardando ser agrupado com outros itens do mesmo tipo para iniciar o transporte.',
+      });
+    } else {
+      // Evento 2: agrupamento em lote
+      timeline.push({
+        tipo: 'agrupamento',
+        data: lote.dataCriacao,
+        titulo: `Agrupado no Lote ${lote.numeroSerie}`,
+        descricao: `Seu produto foi consolidado no lote ${lote.numeroSerie} junto com mais ${lote.produtosNumeroControle.length - 1} item(ns) do tipo ${lote.tipoProduto}.`,
+      });
+
+      // Evento 3+: cada transporte vira um passo
+      transportes.forEach((t) => {
+        timeline.push({
+          tipo: 'transporte',
+          data: t.dataRegistro,
+          titulo: `Envio ${t.codigoEnvio}`,
+          descricao: `Transportado de ${t.cnpjRemetente} para ${t.cnpjDestinatario}.`,
+        });
+      });
+    }
+
+    return {
+      produto: { ...produto },
+      lote: lote ? { ...lote } : null,
+      transportes,
+      timeline,
+    } as LogisticaProduto;
   },
 };

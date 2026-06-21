@@ -99,3 +99,29 @@ export const IconPlus: React.FC<IconProps> = ({ size = 18, style }) => (
     <path d="M12 5v14M5 12h14" />
   </svg>
 );
+
+export const IconUser: React.FC<IconProps> = ({ size = 18, style }) => (
+  <svg {...base} viewBox="0 0 24 24" width={size} height={size} style={style}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+  </svg>
+);
+
+export const IconMapPin: React.FC<IconProps> = ({ size = 18, style }) => (
+  <svg {...base} viewBox="0 0 24 24" width={size} height={size} style={style}>
+    <path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7Z" />
+    <circle cx="12" cy="9" r="2.5" />
+  </svg>
+);
+
+export const IconChevronRight: React.FC<IconProps> = ({ size = 18, style }) => (
+  <svg {...base} viewBox="0 0 24 24" width={size} height={size} style={style}>
+    <path d="M9 18l6-6-6-6" />
+  </svg>
+);
+
+export const IconX: React.FC<IconProps> = ({ size = 18, style }) => (
+  <svg {...base} viewBox="0 0 24 24" width={size} height={size} style={style}>
+    <path d="M18 6 6 18M6 6l12 12" />
+  </svg>
+);

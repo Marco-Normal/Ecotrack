@@ -10,6 +10,10 @@ export interface Produto {
   numeroControle: string;
   tipo: TipoProduto;
   loteId?: string;
+  /** CPF do cidadão que realizou o descarte. Opcional para produtos sem vínculo. */
+  pessoaCpf?: string;
+  /** Data em que o produto foi entregue no centro de coleta. */
+  dataDescarte?: string;
 }
 
 export interface Lote {
@@ -50,6 +54,25 @@ export interface NovoTransporteInput {
   cnpjDestinatario: string;
 }
 
+// ---------- Área do Cidadão --------------------------------------------------
+
+/** Um passo da linha do tempo logística de um produto. */
+export interface EventoLogistico {
+  tipo: 'coleta' | 'agrupamento' | 'transporte' | 'aguardando';
+  data: string;
+  titulo: string;
+  descricao: string;
+}
+
+/** Resposta completa do rastreio de um produto individual do cidadão. */
+export interface LogisticaProduto {
+  produto: Produto;
+  lote: Lote | null;
+  transportes: Transporte[];
+  /** Linha do tempo ordenada cronologicamente, pronta para renderizar. */
+  timeline: EventoLogistico[];
+}
+
 /**
  * Contrato da camada de serviço.
  * Para conectar um backend real, basta reimplementar esta interface —
@@ -66,4 +89,8 @@ export interface ApiService {
   criarTransporte(input: NovoTransporteInput): Promise<Transporte>;
   rastrearLote(numeroSerie: string): Promise<ResultadoRastreio>;
   obterResumo(): Promise<ResumoPainel>;
+  /** Área do Cidadão: retorna todos os produtos descartados pelo CPF informado. */
+  buscarProdutosPorCpf(cpf: string): Promise<Produto[]>;
+  /** Área do Cidadão: retorna a linha do tempo logística completa de um produto. */
+  obterLogisticaProduto(numeroControle: string): Promise<LogisticaProduto>;
 }
