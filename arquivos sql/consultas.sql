@@ -39,6 +39,7 @@ HAVING AVG(h_fim.dataHora - h_inicio.dataHora) > (
 );
 
 /*
+vida_completa_produto
 Essa query tem a função de listar todo caminho que o
 `produto` realizou até o momento, devolvendo quem foi que
 entregou o produto, a quantidade, para qual empresa, e quais
