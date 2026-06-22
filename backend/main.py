@@ -91,7 +91,6 @@ class CriarLoteInput(BaseModel):
     produtos: List[uuid.UUID]
 
 class CriarTransporteInput(BaseModel):
-    codEnvio: Optional[uuid.UUID] = None
     nome: Optional[str] = None
     destinatario: str
     remetente: str
@@ -185,8 +184,7 @@ async def criar_lote(input: CriarLoteInput, db: PgPool = Depends(get_db)):
 
 @app.post("/api/transportes", response_model=TransporteSchema)
 async def criar_transporte(input: CriarTransporteInput, db: PgPool = Depends(get_db)):
-    cod_envio = input.codEnvio or uuid.uuid4()
-    res = db.inserir_transporte(cod_envio, input.nome, input.destinatario, input.remetente, input.lote)
+    res = db.inserir_transporte(input.nome, input.destinatario, input.remetente, input.lote)
     if not res:
         raise HTTPException(status_code=500, detail="Falha ao criar transporte")
     return TransporteSchema(**dict(zip(["codEnvio","nome","destinatario","remetente","lote"], res)))

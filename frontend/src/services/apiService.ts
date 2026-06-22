@@ -142,7 +142,7 @@ export const apiService: ApiService = {
 
   async criarTransporte(input: NovoTransporteInput) {
     const { data } = await API.post('/api/transportes', {
-      codEnvio: input.codigoEnvio,
+      codEnvio: undefined,
       nome: input.nome,
       destinatario: input.cnpjDestinatario.replace(/\D/g, ''),
       remetente: input.cnpjRemetente.replace(/\D/g, ''),
