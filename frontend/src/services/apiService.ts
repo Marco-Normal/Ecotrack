@@ -2,17 +2,15 @@ import axios from 'axios';
 import type {
   ApiService,
   EventoLogistico,
-  LogisticaProduto,
   Lote,
   Produto,
   Transporte,
   NovoTransporteInput,
   TipoProduto,
-  ResultadoRastreio,
-  ResumoPainel,
 } from '../types';
 
-const API = axios.create({ baseURL: 'http://localhost:8000' });
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+const API = axios.create({ baseURL: API_BASE });
 
 // Interceptor para transformar erros HTTP em mensagens amigáveis
 API.interceptors.response.use(

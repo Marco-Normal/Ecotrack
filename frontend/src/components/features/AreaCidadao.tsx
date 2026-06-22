@@ -27,7 +27,6 @@ import {
   StatusBanner,
   PrimaryButton,
   TipoBadge,
-  TagLabel,
 } from '../ui';
 
 // ---------- helpers de formatação --------------------------------------------

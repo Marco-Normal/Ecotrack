@@ -4,15 +4,16 @@ from contextlib import contextmanager
 
 
 class PgPool:
-    def __init__(self, user: str, password: str, dbname="ecotrack"):
+    def __init__(self, user: str, password: str, dbname="ecotrack", host="localhost"):
         self.dbname = dbname
         self.user = user
         self.password = password
+        self.host = host
 
     @contextmanager
     def _pegar_cursor(self):
         with psycopg.connect(
-            host="localhost",
+            host=self.host,
             port=5432,
             dbname=self.dbname,
             user=self.user,

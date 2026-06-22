@@ -8,11 +8,12 @@ load_dotenv()
 DB_USER = os.getenv("DB_USER", "admin")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "admin")
 DB_NAME = os.getenv("DB_NAME", "ecotrack")
+DB_HOST = os.getenv("DB_HOST", "localhost")
 
 SEED_DIR = os.path.dirname(os.path.abspath(__file__))
 
 conn = psycopg.connect(
-    host="localhost",
+    host=DB_HOST,
     port=5432,
     dbname=DB_NAME,
     user=DB_USER,

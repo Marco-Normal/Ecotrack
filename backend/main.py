@@ -27,7 +27,8 @@ app.add_middleware(
 def get_db():
     pool = PgPool(user=os.getenv("DB_USER","postgres"),
                    password=os.getenv("DB_PASSWORD","postgres"),
-                   dbname=os.getenv("DB_NAME","ecotrack"))
+                   dbname=os.getenv("DB_NAME","ecotrack"),
+                   host=os.getenv("DB_HOST","localhost"))
     try:
         yield pool
     finally:
