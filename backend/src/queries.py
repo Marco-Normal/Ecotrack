@@ -84,19 +84,17 @@ class PgPool:
             return cursor.fetchall()
 
     def inserir_produto(self, nro_controle: uuid.UUID, nome: str, tipo: str, pessoa_cpf: str, qtd: int, creditos: int):
-        with self._conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO produto (nroControle, nome, tipo, pessoa, qtd) VALUES (%s, %s, %s, %s, %s) RETURNING nroControle, nome, centroColeta, dataHora, tipo, pessoa, qtd",
-                    (nro_controle, nome, tipo, pessoa_cpf, qtd),
-                )
-                result = cur.fetchone()
-                cur.execute(
-                    "UPDATE pessoa SET creditos = creditos + %s WHERE cpf = %s",
-                    (creditos, pessoa_cpf),
-                )
-                conn.commit()
-                return result
+        with self._pegar_cursor() as cur:
+            cur.execute(
+                "INSERT INTO produto (nroControle, nome, tipo, pessoa, qtd) VALUES (%s, %s, %s, %s, %s) RETURNING nroControle, nome, centroColeta, dataHora, tipo, pessoa, qtd",
+                (nro_controle, nome, tipo, pessoa_cpf, qtd),
+            )
+            result = cur.fetchone()
+            cur.execute(
+                "UPDATE pessoa SET creditos = creditos + %s WHERE cpf = %s",
+                (creditos, pessoa_cpf),
+            )
+            return result
 
     # ── Lotes ─────────────────────────────────────────────────────────
 
@@ -135,13 +133,12 @@ class PgPool:
 
     def gerar_nome_lote(self, tipo: str) -> str:
         abreviacao = self.TIPO_ABBREV.get(tipo, tipo[:3].upper())
-        with self._conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT COUNT(*) FROM lote WHERE tipo = %s",
-                    (tipo,),
-                )
-                seq = cur.fetchone()[0] + 1
+        with self._pegar_cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) FROM lote WHERE tipo = %s",
+                (tipo,),
+            )
+            seq = cur.fetchone()[0] + 1
         return f"LOTE-{abreviacao}-{seq:03d}"
 
     def inserir_lote(self, nro_serie: uuid.UUID, nome: str | None, tipo: str):
@@ -200,20 +197,18 @@ class PgPool:
     def criar_lote_com_produtos(
         self, nro_serie: uuid.UUID, nome: str | None, tipo: str, produtos: list[uuid.UUID]
     ):
-        with self._conn() as conn:
-            with conn.cursor() as cur:
+        with self._pegar_cursor() as cur:
+            cur.execute(
+                "INSERT INTO lote (nroSerie, nome, tipo) VALUES (%s, %s, %s) "
+                "RETURNING nroSerie, nome, tipo, dataHora",
+                (nro_serie, nome, tipo),
+            )
+            lote = cur.fetchone()
+            for prod in produtos:
                 cur.execute(
-                    "INSERT INTO lote (nroSerie, nome, tipo) VALUES (%s, %s, %s) "
-                    "RETURNING nroSerie, nome, tipo, dataHora",
-                    (nro_serie, nome, tipo),
+                    "INSERT INTO dentroLote (produto, nroSerie) VALUES (%s, %s)",
+                    (prod, nro_serie),
                 )
-                lote = cur.fetchone()
-                for prod in produtos:
-                    cur.execute(
-                        "INSERT INTO dentroLote (produto, nroSerie) VALUES (%s, %s)",
-                        (prod, nro_serie),
-                    )
-            conn.commit()  # só chega aqui se tudo der certo
         return lote
 
     # ── Transportes ──────────────────────────────────────────────────
@@ -662,30 +657,26 @@ class PgPool:
 
     def cidadao_por_cpf(self, cpf: str):
         """Busca os dados e saldo atual do cidadão."""
-        with self._conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT cpf, nome, creditos FROM pessoa WHERE cpf = %s", (cpf,))
-                return cur.fetchone()
+        with self._pegar_cursor() as cur:
+            cur.execute("SELECT cpf, nome, creditos FROM pessoa WHERE cpf = %s", (cpf,))
+            return cur.fetchone()
 
     def listar_estoque_resgate(self):
         """Lista opções de resgate que possuem quantidade > 0."""
-        with self._conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT e.cnpj, emp.nome, e.tipo, e.valor, e.quantidade 
-                    FROM estoque e
-                    INNER JOIN empresas emp ON e.cnpj = emp.cnpj
-                    WHERE e.quantidade > 0
-                """)
-                return cur.fetchall()
+        with self._pegar_cursor() as cur:
+            cur.execute("""
+                SELECT e.cnpj, emp.nome, e.tipo, e.valor, e.quantidade 
+                FROM estoque e
+                INNER JOIN empresas emp ON e.cnpj = emp.cnpj
+                WHERE e.quantidade > 0
+            """)
+            return cur.fetchall()
 
     def executar_resgate_transacao(self, cpf: str, cnpj: str, tipo_estoque: str):
         """Transação ACID blindada para resgate de créditos."""
-        with self._conn() as conn:
-            # O bloco with conn.transaction() garante o COMMIT ou ROLLBACK automático
-            with conn.transaction():
-                with conn.cursor() as cur:
-                    
+        with self._pegar_cursor() as cur:
+            with cur.connection.transaction():
+
                     # 1. Trava a linha da pessoa (FOR UPDATE) e checa o saldo
                     cur.execute("SELECT creditos FROM pessoa WHERE cpf = %s FOR UPDATE", (cpf,))
                     pessoa = cur.fetchone()
