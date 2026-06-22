@@ -21,7 +21,7 @@ const CadastroTransporte: React.FC = () => {
   const [isLoadingLotes, setIsLoadingLotes] = useState(true);
 
   const [loteId, setLoteId]                     = useState('');
-  const [codigoEnvio]                           = useState(crypto.randomUUID());
+  const [codigoEnvio]                           = useState('');
   const [nomeTransporte, setNomeTransporte]     = useState('');
   const [cnpjRemetente, setCnpjRemetente]       = useState('');
   const [cnpjDestinatario, setCnpjDestinatario] = useState('');
@@ -50,7 +50,7 @@ const CadastroTransporte: React.FC = () => {
     try {
       const novo = await apiService.criarTransporte({
         loteId,
-        codigoEnvio,
+        codigoEnvio: '',
         nome: nomeTransporte,
         cnpjRemetente,
         cnpjDestinatario,

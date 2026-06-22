@@ -358,7 +358,24 @@ const AreaCidadao: React.FC = () => {
       const resultado = await apiService.obterLogisticaProduto(numeroControle);
       setLogistica(resultado);
     } catch (err) {
-      setErroLogistica(err instanceof Error ? err.message : 'Erro ao carregar rastreamento.');
+      // Se a timeline completa não foi encontrada, constrói uma básica
+      // com os dados do produto já disponíveis na lista
+      const produto = produtos?.find(p => p.numeroControle === numeroControle);
+      if (produto) {
+        setLogistica({
+          produto,
+          lote: null,
+          transportes: [],
+          timeline: [{
+            tipo: 'aguardando',
+            data: produto.dataDescarte ?? new Date().toISOString(),
+            titulo: 'Produto recebido no Centro de Coleta',
+            descricao: `${produto.nome} — Aguardando formação de lote e transporte.`,
+          }],
+        });
+      } else {
+        setErroLogistica(err instanceof Error ? err.message : 'Erro ao carregar rastreamento.');
+      }
     } finally {
       setIsLoadingLogistica(false);
     }

@@ -214,24 +214,32 @@ class PgPool:
 
     # ── Transportes ──────────────────────────────────────────────────
 
-    def inserir_transporte(self, cod_envio: uuid.UUID, nome: str | None, destinatario: str, remetente: str, lote: uuid.UUID):
+    def inserir_transporte(self, nome: str | None, destinatario: str, remetente: str, lote: uuid.UUID):
         """Essa query insere um novo transporte na tabela `transporte`,
-        associando um código de envio (codEnvio), um nome opcional
-        (nome), o CNPJ do destinatário (destinatario), o CNPJ do
-        remetente (remetente) e o lote transportado (lote).
+        associando um nome opcional (nome), o CNPJ do destinatário
+        (destinatario), o CNPJ do remetente (remetente) e o lote
+        transportado (lote). O codEnvio é gerado automaticamente pelo
+        banco via DEFAULT gen_random_uuid().
+
+        Também insere um registro inicial na tabela `historico` com
+        status 'Processando' e a data/hora atual.
 
         Utiliza `RETURNING` para devolver os dados completos do
-        transporte recém-criado. O codEnvio é gerado como UUID pelo
-        frontend.
+        transporte recém-criado.
 
         Chamada pelo endpoint POST /api/transportes.
         """
         with self._pegar_cursor() as cursor:
             cursor.execute(
-                "INSERT INTO transporte (codEnvio, nome, destinatario, remetente, lote) VALUES (%s, %s, %s, %s, %s) RETURNING codEnvio, nome, destinatario, remetente, lote",
-                (cod_envio, nome, destinatario, remetente, lote),
+                "INSERT INTO transporte (nome, destinatario, remetente, lote) VALUES (%s, %s, %s, %s) RETURNING codEnvio, nome, destinatario, remetente, lote",
+                (nome, destinatario, remetente, lote),
             )
-            return cursor.fetchone()
+            row = cursor.fetchone()
+            cursor.execute(
+                "INSERT INTO historico (codEnvio, status) VALUES (%s, 'Processando') ON CONFLICT DO NOTHING",
+                (row[0],),
+            )
+            return row
 
     def transportes_do_lote(self, nro_serie: uuid.UUID):
         """Essa query lista todos os transportes associados a um
