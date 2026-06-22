@@ -351,45 +351,6 @@ class PgPool:
 
     # ── Área do Cidadão ─────────────────────────────────────────────
 
-    def timeline_logistica(self, nro_controle: uuid.UUID):
-        """Essa query monta a linha do tempo logística de um produto
-        específico, identificado pelo seu número de controle
-        (nroControle). Ela devolve o nome do cidadão que descartou o
-        produto, o tipo do produto, a quantidade, o nome da empresa
-        destinatária e a data/hora da entrega.
-
-        Para isso, uma sequência de INNER JOINs é realizada: partimos
-        da `pessoa` que descartou o produto (primeiro JOIN com
-        `produto`), seguimos para o lote ao qual o produto pertence
-        (segundo JOIN com `dentroLote` e terceiro com `lote`),
-        identificamos o transporte desse lote (quarto JOIN com
-        `transporte`), buscamos o nome da empresa destinatária (quinto
-        JOIN com `empresas`) e, por fim, pegamos a data e hora do
-        histórico de entrega (sexto JOIN com `historico`).
-
-        Os resultados são ordenados do mais recente para o mais antigo.
-
-        Chamada pelo endpoint GET /api/produtos/{nroControle}/logistica.
-        """
-        with self._pegar_cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT p.nome AS nome_cidadao, prod.tipo AS tipo_produto, prod.qtd AS quantidade,
-                       emp_destino.nome AS empresa_destino, h.dataHora AS horario_entrega
-                FROM pessoa AS p
-                INNER JOIN produto AS prod ON p.cpf = prod.pessoa
-                INNER JOIN dentroLote AS dl ON prod.nroControle = dl.produto
-                INNER JOIN lote AS l ON dl.nroSerie = l.nroSerie
-                INNER JOIN transporte AS t ON l.nroSerie = t.lote
-                INNER JOIN empresas AS emp_destino ON t.destinatario = emp_destino.cnpj
-                INNER JOIN historico AS h ON t.codEnvio = h.codEnvio
-                WHERE prod.nroControle = %s
-                ORDER BY h.dataHora DESC
-                """,
-                (nro_controle,),
-            )
-            return cursor.fetchall()
-
     def vida_completa_produto(self, produto: uuid.UUID):
         """Essa query tem a função de listar todo caminho que o
         `produto` realizou até o momento, devolvendo quem foi que
@@ -413,8 +374,8 @@ class PgPool:
             cursor.execute(
                 """
                     SELECT p.nome AS nome_cidadao, prod.tipo AS tipo_produto,
-                           prod.qtd AS quantidade, emp_destino.nome AS empresa_destino,
-                           h.dataHora AS horario_entrega
+                        prod.qtd AS quantidade, emp_destino.nome AS empresa_destino,
+                        h.dataHora AS horario_entrega
                     FROM pessoa AS p
                     INNER JOIN produto AS prod ON p.cpf = prod.pessoa
                     INNER JOIN dentroLote AS dl ON prod.nroControle = dl.produto

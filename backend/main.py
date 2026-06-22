@@ -149,7 +149,7 @@ async def produtos_por_cpf(cpf: str, db: PgPool = Depends(get_db)):
 
 @app.get("/api/produtos/{numeroControle}/logistica")
 async def logistica(numeroControle: uuid.UUID, db: PgPool = Depends(get_db)):
-    rows = db.timeline_logistica(numeroControle)
+    rows = db.vida_completa_produto(numeroControle)
     if not rows:
         raise HTTPException(status_code=404, detail="Timeline não encontrada")
     keys = ["nome_cidadao","tipo_produto","quantidade","empresa_destino","horario_entrega"]
