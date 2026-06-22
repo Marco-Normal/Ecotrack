@@ -113,21 +113,31 @@ export const apiService: ApiService = {
     return lotes;
   },
 
-  async criarLote(numeroSerie: string, tipoProduto: TipoProduto, numerosControle: string[], nome?: string) {
+  async criarLote(numeroSerie: string, tipoProduto: TipoProduto, numerosControle: string[]) {
     const { data } = await API.post('/api/lotes', {
       nroSerie: numeroSerie,
-      nome,
       tipo: TIPO_BACKEND[tipoProduto] ?? tipoProduto,
       produtos: numerosControle,
     });
     return {
       id: data.nroSerie ?? '',
       numeroSerie: data.nroSerie ?? '',
-      nome: data.nome ?? nome,
+      nome: data.nome ?? undefined,
       tipoProduto,
       produtosNumeroControle: numerosControle,
       dataCriacao: data.dataHora ?? new Date().toISOString(),
     };
+  },
+
+  async criarProduto(nome: string, tipo: TipoProduto, qtd: number, pessoa: string, creditos: number) {
+    const { data } = await API.post('/api/produtos', {
+      nome,
+      tipo: TIPO_BACKEND[tipo] ?? tipo,
+      qtd,
+      pessoa,
+      creditos,
+    });
+    return montarProduto(data);
   },
 
   async criarTransporte(input: NovoTransporteInput) {

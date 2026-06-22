@@ -97,6 +97,13 @@ class CriarTransporteInput(BaseModel):
     remetente: str
     lote: uuid.UUID
 
+class CriarProdutoInput(BaseModel):
+    nome: str
+    tipo: str
+    qtd: int
+    pessoa: str
+    creditos: int
+
 class ResgateInput(BaseModel):
     cpf: str
     cnpj: str
@@ -115,12 +122,24 @@ async def listar_produtos(tipo: Optional[str] = None, db: PgPool = Depends(get_d
         raise HTTPException(status_code=404, detail="Nenhum produto encontrado")
     return [ProdutoSchema(**dict(zip(["nroControle","nome","centroColeta","dataHora","tipo","pessoa","qtd"], r))) for r in rows]
 
+@app.post("/api/produtos", response_model=ProdutoSchema)
+async def criar_produto(input: CriarProdutoInput, db: PgPool = Depends(get_db)):
+    with db._pegar_cursor() as cur:
+        cur.execute("SELECT cpf FROM pessoa WHERE cpf = %s", (input.pessoa,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="CPF não encontrado")
+    tipo_db = normalizar_tipo(input.tipo)
+    nro_controle = uuid.uuid4()
+    produto = db.inserir_produto(nro_controle, input.nome, tipo_db, input.pessoa, input.qtd, input.creditos)
+    if not produto:
+        raise HTTPException(status_code=500, detail="Falha ao criar produto")
+    return ProdutoSchema(**dict(zip(["nroControle","nome","centroColeta","dataHora","tipo","pessoa","qtd"], produto)))
+
 @app.get("/api/produtos/{cpf}", response_model=List[ProdutoSchema])
 async def produtos_por_cpf(cpf: str, db: PgPool = Depends(get_db)):
-    with db._conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT cpf, nome, creditos FROM pessoa WHERE cpf = %s", (cpf,))
-            pessoa = cur.fetchone()
+    with db._pegar_cursor() as cur:
+        cur.execute("SELECT cpf, nome, creditos FROM pessoa WHERE cpf = %s", (cpf,))
+        pessoa = cur.fetchone()
     if not pessoa:
         raise HTTPException(status_code=404, detail="CPF não encontrado")
     rows = db.produtos_por_cpf(cpf)
@@ -153,9 +172,10 @@ async def produtos_do_lote(nroSerie: uuid.UUID, db: PgPool = Depends(get_db)):
 @app.post("/api/lotes", response_model=LoteSchema)
 async def criar_lote(input: CriarLoteInput, db: PgPool = Depends(get_db)):
     tipo_db = normalizar_tipo(input.tipo)
+    nome = input.nome or db.gerar_nome_lote(tipo_db)
     try:
         lote = db.criar_lote_com_produtos(
-            input.nroSerie, input.nome, tipo_db, input.produtos
+            input.nroSerie, nome, tipo_db, input.produtos
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

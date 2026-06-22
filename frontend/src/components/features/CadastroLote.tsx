@@ -25,7 +25,6 @@ const CadastroLote: React.FC = () => {
   const [produtos, setProdutos]               = useState<Produto[]>([]);
   const [selecionados, setSelecionados]       = useState<Set<string>>(new Set());
   const [numeroSerie]                         = useState(gerarUUID);
-  const [nomeLote, setNomeLote]               = useState('');
 
   const [isLoadingProdutos, setIsLoadingProdutos] = useState(false);
   const [isSubmitting, setIsSubmitting]           = useState(false);
@@ -70,11 +69,9 @@ const CadastroLote: React.FC = () => {
       const novoLote = await apiService.criarLote(
         numeroSerie,
         tipoSelecionado,
-        Array.from(selecionados),
-        nomeLote
+        Array.from(selecionados)
       );
       setSucesso(novoLote);
-      setNomeLote('');
       setSelecionados(new Set());
       // Recarrega a lista para refletir os produtos que acabaram de entrar no lote
       const atualizados = await apiService.listarProdutosDisponiveisPorTipo(tipoSelecionado);
@@ -87,7 +84,7 @@ const CadastroLote: React.FC = () => {
   }
 
   const podeSalvar =
-    Boolean(tipoSelecionado) && selecionados.size > 0 && nomeLote.trim().length > 0;
+    Boolean(tipoSelecionado) && selecionados.size > 0;
 
   return (
     <SectionCard
@@ -129,34 +126,22 @@ const CadastroLote: React.FC = () => {
             )}
 
             {!isLoadingProdutos && produtos.length > 0 && (
-              <div style={styles.checkboxList}>
-                {produtos.map((p) => (
-                  <label key={p.numeroControle} className="ecotrack-checkbox-row" style={styles.checkboxRow}>
-                    <input
-                      type="checkbox"
-                      checked={selecionados.has(p.numeroControle)}
-                      onChange={() => alternarProduto(p.numeroControle)}
-                    />
-                    <span style={styles.checkboxLabel}>{p.nome}</span>
-                  </label>
-                ))}
-              </div>
+              <>
+                <div style={styles.checkboxList}>
+                  {produtos.map((p) => (
+                    <label key={p.numeroControle} className="ecotrack-checkbox-row" style={styles.checkboxRow}>
+                      <input
+                        type="checkbox"
+                        checked={selecionados.has(p.numeroControle)}
+                        onChange={() => alternarProduto(p.numeroControle)}
+                      />
+                      <span style={styles.checkboxLabel}>{p.nome}</span>
+                    </label>
+                  ))}
+                </div>
+                <span style={styles.helperText}>{selecionados.size} produto(s) selecionado(s)</span>
+              </>
             )}
-          </div>
-        )}
-
-        {/* Passo 3 — nome do lote */}
-        {tipoSelecionado && produtos.length > 0 && (
-          <div style={styles.field}>
-            <label style={styles.label} htmlFor="nome-lote">3. Nome do lote</label>
-            <input
-              id="nome-lote"
-              style={styles.input}
-              placeholder="ex.: LOTE-ECO-2026-001"
-              value={nomeLote}
-              onChange={(e) => setNomeLote(e.target.value)}
-            />
-            <span style={styles.helperText}>{selecionados.size} produto(s) selecionado(s)</span>
           </div>
         )}
 
