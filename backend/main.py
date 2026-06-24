@@ -99,6 +99,7 @@ class CriarTransporteInput(BaseModel):
 
 class CriarProdutoInput(BaseModel):
     nome: str
+    centroColeta: Optional[str] = None
     tipo: str
     qtd: int
     pessoa: str
@@ -130,7 +131,7 @@ async def criar_produto(input: CriarProdutoInput, db: PgPool = Depends(get_db)):
             raise HTTPException(status_code=404, detail="CPF não encontrado")
     tipo_db = normalizar_tipo(input.tipo)
     nro_controle = uuid.uuid4()
-    produto = db.inserir_produto(nro_controle, input.nome, tipo_db, input.pessoa, input.qtd, input.creditos)
+    produto = db.inserir_produto(nro_controle, input.nome, input.centroColeta, tipo_db, input.pessoa, input.qtd, input.creditos)
     if not produto:
         raise HTTPException(status_code=500, detail="Falha ao criar produto")
     return ProdutoSchema(**dict(zip(["nroControle","nome","centroColeta","dataHora","tipo","pessoa","qtd"], produto)))

@@ -118,13 +118,6 @@ const CadastroLote: React.FC = () => {
               <StatusBanner variant="loading">Buscando produtos disponíveis...</StatusBanner>
             )}
 
-            {!isLoadingProdutos && produtos.length === 0 && (
-              <p style={styles.emptyState}>
-                Não há produtos do tipo &quot;{tipoSelecionado}&quot; disponíveis no momento.
-                Eles podem já estar em algum lote.
-              </p>
-            )}
-
             {!isLoadingProdutos && produtos.length > 0 && (
               <>
                 <div style={styles.checkboxList}>

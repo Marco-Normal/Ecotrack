@@ -53,6 +53,12 @@ const CadastroTransporte: React.FC = () => {
     setErro(null);
     setSucesso(null);
     setIsSubmitting(true);
+    console.log("Registrando transporte:", {
+      loteId,
+      nomeTransporte,
+      cnpjRemetente,
+      cnpjDestinatario,
+    });
 
     try {
       const novo = await apiService.criarTransporte({

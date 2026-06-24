@@ -356,6 +356,7 @@ const AreaCidadao: React.FC = () => {
 
     try {
       const resultado = await apiService.obterLogisticaProduto(numeroControle);
+      console.log('Logística carregada:', resultado);
       setLogistica(resultado);
     } catch (err) {
       // Se a timeline completa não foi encontrada, constrói uma básica

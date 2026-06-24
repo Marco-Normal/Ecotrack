@@ -11,6 +11,7 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 const API = axios.create({ baseURL: API_BASE });
+const centroColeta = '33444555000103';
 
 // Interceptor para transformar erros HTTP em mensagens amigáveis
 API.interceptors.response.use(
@@ -25,7 +26,7 @@ API.interceptors.response.use(
       throw new Error(detail ?? 'Nenhum registro encontrado.');
     }
     if (status === 500) {
-      throw new Error('Erro interno do servidor. Tente novamente mais tarde.');
+      throw new Error('Erro.');
     }
     throw new Error(err.response.data?.detail ?? `Erro inesperado (${status}).`);
   }
@@ -131,6 +132,7 @@ export const apiService: ApiService = {
     const { data } = await API.post('/api/produtos', {
       nome,
       tipo: TIPO_BACKEND[tipo] ?? tipo,
+      centroColeta,
       qtd,
       pessoa,
       creditos,
@@ -191,12 +193,36 @@ export const apiService: ApiService = {
       tipo: asTipoProduto(rows[0]?.tipo_produto ?? 'Reciclavel'),
       dataDescarte: rows[0]?.horario_entrega ?? undefined,
     };
-    const timeline: EventoLogistico[] = rows.map((r: any, i: number) => ({
-      tipo: i === 0 ? 'coleta' : 'transporte',
-      data: r.horario_entrega ?? new Date().toISOString(),
-      titulo: i === 0 ? 'Recebido no Centro de Coleta' : `Transporte para ${r.empresa_destino}`,
-      descricao: `${r.tipo_produto} — ${r.quantidade} unidade(s) — ${r.empresa_destino}`,
-    }));
+    const timeline: EventoLogistico[] = [
+      {
+        tipo: 'coleta',
+        data: produto.dataDescarte ?? new Date().toISOString(),
+        titulo: 'Recebido no Centro de Coleta',
+        descricao: `Entregue e registrado no sistema.`,
+      },
+
+      ...rows
+        .filter((r: any) => r.empresa_destino != null)
+        .map((r: any) => {
+          const data =
+            r.horario_entrega ??
+            r.data_transporte ??
+            new Date().toISOString();
+
+          const entregue = Boolean(r.horario_entrega);
+
+          return {
+            tipo: 'transporte' as const,
+            data,
+            titulo: entregue
+              ? `Em trânsito para ${r.empresa_destino}`
+              : `Entregue para ${r.empresa_destino}`,
+            descricao: `${r.tipo_produto} — ${r.quantidade} unidade(s)${
+              entregue ? ' (entrega pendente)' : ''
+            }`,
+          };
+        }),
+    ];
     return {
       produto,
       lote: null,

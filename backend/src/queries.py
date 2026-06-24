@@ -84,11 +84,11 @@ class PgPool:
             )
             return cursor.fetchall()
 
-    def inserir_produto(self, nro_controle: uuid.UUID, nome: str, tipo: str, pessoa_cpf: str, qtd: int, creditos: int):
+    def inserir_produto(self, nro_controle: uuid.UUID, nome: str, centroColeta: str, tipo: str, pessoa_cpf: str, qtd: int, creditos: int):
         with self._pegar_cursor() as cur:
             cur.execute(
-                "INSERT INTO produto (nroControle, nome, tipo, pessoa, qtd) VALUES (%s, %s, %s, %s, %s) RETURNING nroControle, nome, centroColeta, dataHora, tipo, pessoa, qtd",
-                (nro_controle, nome, tipo, pessoa_cpf, qtd),
+                "INSERT INTO produto (nroControle, nome, centroColeta, tipo, pessoa, qtd) VALUES (%s, %s, %s, %s, %s, %s) RETURNING nroControle, nome, centroColeta, dataHora, tipo, pessoa, qtd",
+                (nro_controle, nome, centroColeta, tipo, pessoa_cpf, qtd),
             )
             result = cur.fetchone()
             cur.execute(
@@ -380,9 +380,9 @@ class PgPool:
                     INNER JOIN produto AS prod ON p.cpf = prod.pessoa
                     INNER JOIN dentroLote AS dl ON prod.nroControle = dl.produto
                     INNER JOIN lote AS l ON dl.nroSerie = l.nroSerie
-                    INNER JOIN transporte AS t ON l.nroSerie = t.lote
-                    INNER JOIN empresas AS emp_destino ON t.destinatario = emp_destino.cnpj
-                    INNER JOIN historico AS h ON t.codEnvio = h.codEnvio
+                    LEFT JOIN transporte AS t ON l.nroSerie = t.lote
+                    LEFT JOIN empresas AS emp_destino ON t.destinatario = emp_destino.cnpj
+                    LEFT JOIN historico AS h ON t.codEnvio = h.codEnvio
                     WHERE prod.nroControle = %s
                     ORDER BY h.dataHora DESC;
                     """,
