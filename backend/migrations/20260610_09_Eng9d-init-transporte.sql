@@ -20,5 +20,7 @@ CREATE TABLE IF NOT EXISTS transporte(
            FOREIGN KEY(lote)
            REFERENCES lote(nroSerie)
            ON DELETE RESTRICT
-           ON UPDATE CASCADE
+           ON UPDATE CASCADE,
+        CONSTRAINT empresas_cnpj_ck 
+           CHECK (destinatario <> remetente)
 );
